@@ -1,5 +1,6 @@
 #Include "Protheus.ch"
 
+
 /*/{Protheus.doc} xParambox
 Função para explicar a função Parambox.
 
@@ -13,7 +14,15 @@ user function testando()
 	RpcClearenv()
 	RPCSetType(3)
 	RpcSetEnv('02')
-	u_RCAP2()
+
+	oCtrDoc := TControleDocumento():New()
+
+	// oCtrDoc:ValidateFile("mago.png", "")
+	//oCtrDoc:InsertDocument("", "")
+
+	//oCtrDoc:InsertACB("TCP 8050 - SPLIT.PDF")
+	oCtrDoc:InsertAC9()
+
 	// Local oReport	:= Nil
 	// Local aPergs    := {}
 	// Local aResps    := {}

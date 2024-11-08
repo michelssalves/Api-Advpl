@@ -15,31 +15,46 @@ user function testando()
 	RPCSetType(3)
 	RpcSetEnv('02')
 
-	oCtrDoc := TControleDocumento():New()
+	Local lRet       := .T.
+	Local cAliasTop := ''
+	Local jResponse  := JsonObject():New()
+	Local cQuery := ''
+	Local i
+	Local aName := {'departamento', 'area', 'diretorio'}
 
-	// oCtrDoc:ValidateFile("mago.png", "")
-	//oCtrDoc:InsertDocument("", "")
+	jResponse['objects'] := JsonObject():New()
 
-	//oCtrDoc:InsertACB("TCP 8050 - SPLIT.PDF")
-	oCtrDoc:InsertAC9()
+	For i := 1 To Len(aName)
 
-	// Local oReport	:= Nil
-	// Local aPergs    := {}
-	// Local aResps    := {}
+		cQuery := "SELECT ZA8_CODIGO, ZA8_DESCRI FROM ZA8020 WHERE D_E_L_E_T_ = '' AND ZA8_CLASSI = '" + cValToChar(i) + "' " + CRLF
 
-	// AAdd(aPergs, {1, "Filial de", Space(TamSX3("C5_FILIAL")[1]) ,,,,, 20, .F.})
-	// AAdd(aPergs, {1, "Filial até", Space(TamSX3("C5_FILIAL")[1]) ,,,,, 20, .F.})
-	// AAdd(aPergs, {1, "Cliente de", Space(TamSX3("A1_COD")[1]) ,,,,, 30, .F.})
-	// AAdd(aPergs, {1, "Cliente até", Space(TamSX3("A1_COD")[1]) ,,,,, 30, .F.})
-	// AAdd(aPergs, {1, "Emissão de", SToD("") ,,,,, 50, .F.})
-	// AAdd(aPergs, {1, "Emissão até", SToD("") ,,,,, 50, .F.})
-	// AAdd(aPergs, {2, "Resultado", "1-Todos" ,{"1-Todos","2-Pedido de Venda","3-Nota Fiscal"},50,"",.F.})
+		cAliasTop := MpSysOpenQuery(cQuery)
 
-	// If ParamBox(aPergs, "Parâmetros do relatório", @aResps,,,,,,,, .T., .T.)
-	// 	oReport := ReportDef(aPergs)
-	// 	oReport:PrintDialog()
-	// EndIf
+		If Empty(cAliasTop)
+			lRet := .F.
+			Exit
+		EndIf
 
+		jResponse['objects'][aName[i]] := {}
+
+		While ! (cAliasTop)->(EoF())
+
+			oRegistro := JsonObject():New()
+			oRegistro['value'] := AllTrim((cAliasTop)->ZA8_CODIGO)
+			oRegistro['label'] := AllTrim((cAliasTop)->ZA8_CODIGO) + " - " + EncodeUTF8(AllTrim((cAliasTop)->ZA8_DESCRI))
+
+			aAdd(jResponse['objects'][aName[i]], oRegistro)
+
+			(cAliasTop)->(DbSkip())
+		EndDo
+
+		(cAliasTop)->(DbCloseArea())
+
+	Next i
+	(cAliasTop)->(DbCloseArea())
+	//Self:SetContentType('application/json')
+	//Self:SetResponse(jResponse:toJSON())
+	//u_RCAP2()
 	RpcClearEnv()
 
 Return

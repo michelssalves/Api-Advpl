@@ -14,47 +14,7 @@ user function testando()
 	RpcClearenv()
 	RPCSetType(3)
 	RpcSetEnv('02')
-
-	Local lRet       := .T.
-	Local cAliasTop := ''
-	Local jResponse  := JsonObject():New()
-	Local cQuery := ''
-	Local i
-	Local aName := {'departamento', 'area', 'diretorio'}
-
-	jResponse['objects'] := JsonObject():New()
-
-	For i := 1 To Len(aName)
-
-		cQuery := "SELECT ZA8_CODIGO, ZA8_DESCRI FROM ZA8020 WHERE D_E_L_E_T_ = '' AND ZA8_CLASSI = '" + cValToChar(i) + "' " + CRLF
-
-		cAliasTop := MpSysOpenQuery(cQuery)
-
-		If Empty(cAliasTop)
-			lRet := .F.
-			Exit
-		EndIf
-
-		jResponse['objects'][aName[i]] := {}
-
-		While ! (cAliasTop)->(EoF())
-
-			oRegistro := JsonObject():New()
-			oRegistro['value'] := AllTrim((cAliasTop)->ZA8_CODIGO)
-			oRegistro['label'] := AllTrim((cAliasTop)->ZA8_CODIGO) + " - " + EncodeUTF8(AllTrim((cAliasTop)->ZA8_DESCRI))
-
-			aAdd(jResponse['objects'][aName[i]], oRegistro)
-
-			(cAliasTop)->(DbSkip())
-		EndDo
-
-		(cAliasTop)->(DbCloseArea())
-
-	Next i
-	(cAliasTop)->(DbCloseArea())
-	//Self:SetContentType('application/json')
-	//Self:SetResponse(jResponse:toJSON())
-	//u_RCAP2()
+	u_RCAP2()
 	RpcClearEnv()
 
 Return

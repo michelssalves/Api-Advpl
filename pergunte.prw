@@ -14,7 +14,11 @@ user function testando()
 	RpcClearenv()
 	RPCSetType(3)
 	RpcSetEnv('02')
-	u_RCAP2()
+
+	u_CLAIMS_EMAIL(177903, {2674764,2674763,2674750})
+
+	//u_TCMD02KM('cFornece','cLoja','cCODEPI','cNumCap','cData','cHora','cQtdEnt','cJustif')
+
 	RpcClearEnv()
 
 Return

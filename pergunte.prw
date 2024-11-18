@@ -12,8 +12,8 @@ Função para explicar a função Parambox.
 user function testando()
 
 	RpcClearenv()
-	RPCSetType(3)
-	RpcSetEnv('02')
+	// RPCSetType(3)
+	RpcSetEnv( "02", "",,,"FIN",,,,,,)
 
 	u_CLAIMS_EMAIL(177903, {2674764,2674763,2674750})
 

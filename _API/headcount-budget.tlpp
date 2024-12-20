@@ -1,0 +1,142 @@
+#INCLUDE "totvs.ch"
+#INCLUDE "restful.ch"
+
+User Function zWSDashRh()
+	Local oService := THTTPService():New()
+	Local cBasePath := "/rest/zWSDashRh"
+
+	// Registra os endpoints
+	oService:Post(cBasePath + "/get_table", { |oRequest| HandleGetTable(oRequest) })
+	oService:Post(cBasePath + "/get_custo", { |oRequest| HandleGetCusto(oRequest) })
+	oService:Post(cBasePath + "/get_funcoes", { |oRequest| HandleGetFuncoes(oRequest) })
+	oService:Post(cBasePath + "/get_diretores", { |oRequest| HandleGetDiretores(oRequest) })
+	oService:Post(cBasePath + "/get_areas", { |oRequest| HandleGetAreas(oRequest) })
+	oService:Post(cBasePath + "/get_depto", { |oRequest| HandleGetDepto(oRequest) })
+
+	// Inicia o serviço
+	oService:Start()
+Return
+
+// Função para processar o endpoint get_table
+Static Function HandleGetTable(oRequest)
+	Local cCodCusto := oRequest:Body["codCusto"]
+	Local cCodDir := oRequest:Body["codDir"]
+	Local cCodArea := oRequest:Body["codArea"]
+	Local cCodDep := oRequest:Body["codDep"]
+	Local cCodFunc := oRequest:Body["codFunc"]
+	Local dDataIni := oRequest:Body["dataIni"]
+	Local jResponse := JsonObject():New()
+
+	// Validação dos dados
+	If Empty(cCodCusto)
+		Return oRequest:ResponseError(400, "Código de custo é obrigatório.")
+	EndIf
+
+	// Processa os dados
+
+	jResponse["table"] := GetTableData(cCodCusto, cCodDir, cCodArea, cCodDep, cCodFunc, dDataIni)
+
+	// Retorna a resposta
+	oRequest:Response(200, jResponse:ToJSON())
+Return
+
+// Função para buscar dados de tabela
+Static Function GetTableData(cCodCusto, cCodDir, cCodArea, cCodDep, cCodFunc, dDataIni)
+	Local cQuery := "SELECT ... FROM ... WHERE ..." // Construa a query como necessário
+	Local aResult := {}
+	Local cAlias := MpSysOpenQuery(cQuery)
+
+	While !EOF()
+		AAdd(aResult, { "field1": (cAlias)->FIELD1, "field2": (cAlias)->FIELD2 })
+		DBSkip()
+	EndDo
+	DBCloseArea()
+Return aResult
+Static Function HandleGetCusto(oRequest)
+	Local cCodCusto := oRequest:Body["codCusto"]
+	Local cCodDir := oRequest:Body["codDir"]
+	Local cCodArea := oRequest:Body["codArea"]
+	Local cCodDep := oRequest:Body["codDep"]
+	Local cCodFunc := oRequest:Body["codFunc"]
+	Local jResponse := JsonObject():New()
+
+	// Validação básica
+	If Empty(cCodCusto)
+		Return oRequest:ResponseError(400, "Código de custo é obrigatório.")
+	EndIf
+
+	// // Constrói a query SQL
+	// // Local cQuery := "SELECT CTT.CTT_CUSTO, CTT.CTT_DESC01 " + ;
+		// 	//                 "FROM CTT020 CTT " + ;
+		// 	//                 "WHERE CTT.D_E_L_E_T_ = '' "
+
+	// If !Empty(cCodCusto)
+	// 	cQuery += "AND CTT.CTT_CUSTO = '" + cCodCusto + "' "
+	// EndIf
+
+	// // Processa a consulta
+	// Local aResult := {}
+	// Local cAlias := MpSysOpenQuery(cQuery)
+
+	// If !Empty(cAlias)
+	// 	While !(cAlias)->(EOF())
+	// 		AAdd(aResult, { ;
+		// 			"custo": AllTrim((cAlias)->CTT_CUSTO), ;
+		// 			"descricao": AllTrim((cAlias)->CTT_DESC01) ;
+		// 			})
+	// 		DBSkip()
+	// 	EndDo
+	// 	DBCloseArea()
+	// Else
+	// 	Return oRequest:ResponseError(500, "Erro ao executar a consulta.")
+	// EndIf
+
+	// Monta a resposta JSON
+	jResponse["custos"] := aResult
+	oRequest:Response(200, jResponse:ToJSON())
+Return
+
+Static Function HandleGetFuncoes(oRequest)
+Return GenericHandler(oRequest, "funcoes")
+	EndFunction
+
+Static Function HandleGetDiretores(oRequest)
+Return GenericHandler(oRequest, "diretores")
+	EndFunction
+
+Static Function HandleGetAreas(oRequest)
+Return GenericHandler(oRequest, "areas")
+	EndFunction
+
+Static Function HandleGetDepto(oRequest)
+Return GenericHandler(oRequest, "depto")
+	EndFunction
+
+// Função genérica para endpoints repetitivos
+Static Function GenericHandler(oRequest, cEndpointType)
+	Local cCodCusto := oRequest:Body["codCusto"]
+	Local cCodDir := oRequest:Body["codDir"]
+	Local cCodArea := oRequest:Body["codArea"]
+	Local cCodDep := oRequest:Body["codDep"]
+	Local cCodFunc := oRequest:Body["codFunc"]
+
+	// Validações básicas
+	// If Empty(cCodCusto)
+	// 	Return oRequest:ResponseError(400, "Código de custo é obrigatório.")
+	// EndIf
+
+	// Local cQuery := "SELECT ... FROM ... WHERE ..." // Construa a query de acordo com o tipo
+	// Local aResult := {}
+	// Local cAlias := MpSysOpenQuery(cQuery)
+
+	// While !EOF()
+	// 	AAdd(aResult, { "field1": (cAlias)->FIELD1, "field2": (cAlias)->FIELD2 })
+	// 	DBSkip()
+	// EndDo
+	// DBCloseArea()
+
+	// Monta a resposta
+	Local jResponse := JsonObject():New()
+	jResponse[cEndpointType] := aResult
+	oRequest:Response(200, jResponse:ToJSON())
+Return

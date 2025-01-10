@@ -12,12 +12,10 @@ Função para explicar a função Parambox.
 user function testando()
 
 	RpcClearenv()
-	// RPCSetType(3)
+	RPCSetType(3)
 	RpcSetEnv( "02", "",,,"FIN",,,,,,)
 
-	u_CLAIMS_EMAIL(177903, {2674764,2674763,2674750})
-
-	//u_TCMD02KM('cFornece','cLoja','cCODEPI','cNumCap','cData','cHora','cQtdEnt','cJustif')
+	u_RCAP2()
 
 	RpcClearEnv()
 
@@ -164,12 +162,12 @@ Static Function REST006B()
 		//Chama a função para buscar arquivos
 		cPasta := tFileDialog(;
 			cTipArq,;                  // Filtragem de tipos de arquivos que serão selecionados
-		cTitulo,;                  // Título da Janela para seleção dos arquivos
-		,;                         // Compatibilidade
-		cDirIni,;                  // Diretório inicial da busca de arquivos
-		lSalvar,;                  // Se for .T., será uma Save Dialog, senão será Open Dialog
-		GETF_RETDIRECTORY;         // Se não passar parâmetro, irá pegar apenas 1 arquivo; Se for informado GETF_MULTISELECT será possível pegar mais de 1 arquivo; Se for informado GETF_RETDIRECTORY será possível selecionar o diretório
-		)
+			cTitulo,;                  // Título da Janela para seleção dos arquivos
+			,;                         // Compatibilidade
+			cDirIni,;                  // Diretório inicial da busca de arquivos
+			lSalvar,;                  // Se for .T., será uma Save Dialog, senão será Open Dialog
+			GETF_RETDIRECTORY;         // Se não passar parâmetro, irá pegar apenas 1 arquivo; Se for informado GETF_MULTISELECT será possível pegar mais de 1 arquivo; Se for informado GETF_RETDIRECTORY será possível selecionar o diretório
+			)
 
 		If Empty(cPasta)
 			FWAlertError("[REST006 - 01] - Nenhuma pasta foi selecionada. A rotina será encerrada! ", "SENTAX")

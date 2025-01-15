@@ -1,0 +1,205 @@
+#INCLUDE "PROTHEUS.CH"
+#INCLUDE "FWBROWSE.CH"
+#INCLUDE "FWMVCDEF.CH"
+#INCLUDE "GCTXDEF.CH"
+
+#INCLUDE "FWEDITPANEL.CH"
+#INCLUDE 'FWLIBVERSION.CH'
+#Include 'TopConn.ch'
+
+User Function relTest()
+
+    RpcClearenv()
+    RPCSetType(3)
+    RpcSetEnv('02')
+    // #INCLUDE "CNTA121.CH"
+    U_ct2dados()
+
+    RpcClearEnv()
+
+Return
+//------------------------------------------------------------------
+/*/{Protheus.doc} CN121Estorn
+Estorna Medição
+@author Leonardo Quintania
+@since 03/09/2015
+/*/
+//-------------------------------------------------------------------
+User Function EstornarMedicao(lAuto,lAprRev,cMedErro)
+
+    Local aArea     := GetArea()
+    Local aAreaCND  := CND->(GetArea())
+    Local lAutForn	:= .F.
+    Local lContinua	:= .T.
+    Local cChave	:= ""
+    Local cFilCNA	:= xFilial("CNA")
+    Local cFilCXN	:= xFilial("CXN")
+    Local nReg		AS Numeric
+    Local bBloco	:= Nil
+    Local oModel    := Nil
+    Default lAuto	:= .F.
+    Default lAprRev := .F.
+    Default cMedErro:= ""
+
+    oModel := FwLoadModel('CNTA121')
+    oModel:SetOperation(MODEL_OPERATION_UPDATE)
+    lContinua := oModel:Activate()
+
+    CND->(DbGoto(44965))
+
+    nReg		:= CND->(Recno())
+    lAutForn    := CND->CND_AUTFRN == "2"
+
+    If lContinua
+
+        lContinua := VldEstorMd(lAprRev, @cMedErro, lAuto)
+
+        //- Verifica se é contrato recorrente e se é a última medição efetuada
+        CXN->(dbSetOrder(1))
+        CNA->(dbSetOrder(1))
+        CXN->(dbSeek(cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)))
+        While !CXN->(Eof()) .And. CXN->(CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED) == cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
+            If CXN->CXN_CHECK
+                If CNA->(MsSeek(cFilCNA+CND->(CND_CONTRA+CND_REVISA)+CXN->CXN_NUMPLA))
+                    //- Se a medição a ser excluída não é a última, não permite exclusão
+                    If !Empty(CNA->CNA_PERIOD) .And. !Empty(CNA->CNA_RECMED) .And. ( CNA->CNA_RECMED <> CND->CND_NUMMED  )
+                        lContinua := .F.
+                        Help(" ",1,"CN121BLQREC") // "Exclusões de medições de contratos recorrentes serão permitidas na ordem inversa da que foram incluídas, a partir da última medição.")
+                        cMsgErro := "CN121BLQREC: " + STR0209
+                        Exit
+                    Endif
+                Endif
+            Endif
+            CXN->(dbSkip())
+        EndDo
+
+        cChave := CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
+        If LockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
+            If lContinua
+                //Chama rotina de estorno por meio de processo
+                If lAutForn
+                    bBloco := {|| lContinua := Cn121AutEst(nReg,!lAuto) }
+                Else
+                    bBloco	:= IIF(lAuto, {|| lContinua := CN121MedEst(nReg,!lAuto,,,lAprRev,@cMedErro) }, {|| lContinua := CN121MedEst(nReg,!lAuto) })
+                EndIf
+
+                If lAuto
+                    Eval(bBloco)
+                Else
+                    Processa(bBloco)
+                Endif
+            EndIf
+        Else
+            // Nao permite processamento concorrente
+            lContinua := .F.
+            If !lAuto
+                Aviso(STR0159,OemtoAnsi(STR0100),{STR0156},2) // ##"Concorrência"##"Esta Medição está em uso por outra estação."
+            Else
+                cMedErro := "CN121CONMED: " + STR0100
+            EndIf
+        EndIf
+    EndIf
+
+    UnLockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
+
+    CN121Limpa() //--Desativa o model do CNTA121 apó finalização do processo.
+
+    RestArea(aAreaCND)
+    RestArea(aArea)
+
+Return lContinua
+
+Function CN121Estorn(lAuto,lAprRev,cMedErro)
+
+    Local aArea     := GetArea()
+    Local aAreaCND  := CND->(GetArea())
+    Local lAutForn	:= CND->CND_AUTFRN == "2"
+    Local lContinua	:= .T.
+    Local cChave	:= ""
+    Local cFilCNA	:= xFilial("CNA")
+    Local cFilCXN	:= xFilial("CXN")
+    Local nReg		:= CND->(Recno())
+    Local bBloco	:= Nil
+    Local oModel    := Nil
+    Default lAuto	:= .F.
+    Default lAprRev := .F.
+    Default cMedErro:= ""
+
+    If Cn121OriMd('CNTA120')
+        If lAuto
+            cMedErro := "CN121MEDPAD: " + STR0127+CRLF+STR0128+CRLF+CRLF+STR0125+CRLF+STR0126
+            lContinua := .F.
+        Else
+            Return CN121OldMd(-1)//Chama o estorno do CNTA120
+        EndIf
+    ElseIf !(Alltrim(CND->CND_SITUAC) $ "E|FE|SE")
+        Help(" ",1,"CN121NoEnc",,STR0102,1,0) //"Operação não permitida. Somente é possível estornar Medições que estejam encerradas"
+        cMedErro := "CN121NoEnc: " + STR0102
+        lContinua := .F.
+    ElseIf ( FindFunction("A300IsGTP") .And. A300IsGTP(.T.) .And. !(FunName() $ "GTPA903") )
+        Help( ,, "CNTA121GTP",, STR0216, 1, 0,,,,,, {STR0217} )//Ação indisponivel para medições integradas ao Gestão de Trasporte de Passageiros.
+        cMedErro  := "CNTA121GTP: " + STR0216
+        lContinua := .F.
+    Else
+        oModel := FwLoadModel('CNTA121')
+        oModel:SetOperation(MODEL_OPERATION_UPDATE)
+        lContinua := oModel:Activate()
+
+        If lContinua
+
+            lContinua := VldEstorMd(lAprRev, @cMedErro, lAuto)
+
+            //- Verifica se é contrato recorrente e se é a última medição efetuada
+            CXN->(dbSetOrder(1))
+            CNA->(dbSetOrder(1))
+            CXN->(dbSeek(cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)))
+            While !CXN->(Eof()) .And. CXN->(CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED) == cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
+                If CXN->CXN_CHECK
+                    If CNA->(MsSeek(cFilCNA+CND->(CND_CONTRA+CND_REVISA)+CXN->CXN_NUMPLA))
+                        //- Se a medição a ser excluída não é a última, não permite exclusão
+                        If !Empty(CNA->CNA_PERIOD) .And. !Empty(CNA->CNA_RECMED) .And. ( CNA->CNA_RECMED <> CND->CND_NUMMED  )
+                            lContinua := .F.
+                            Help(" ",1,"CN121BLQREC") // "Exclusões de medições de contratos recorrentes serão permitidas na ordem inversa da que foram incluídas, a partir da última medição.")
+                            cMsgErro := "CN121BLQREC: " + STR0209
+                            Exit
+                        Endif
+                    Endif
+                Endif
+                CXN->(dbSkip())
+            EndDo
+
+            cChave := CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
+            If LockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
+                If lContinua
+                    //Chama rotina de estorno por meio de processo
+                    If lAutForn
+                        bBloco := {|| lContinua := Cn121AutEst(nReg,!lAuto) }
+                    Else
+                        bBloco	:= IIF(lAuto, {|| lContinua := CN121MedEst(nReg,!lAuto,,,lAprRev,@cMedErro) }, {|| lContinua := CN121MedEst(nReg,!lAuto) })
+                    EndIf
+
+                    If lAuto
+                        Eval(bBloco)
+                    Else
+                        Processa(bBloco)
+                    Endif
+                EndIf
+            Else
+                // Nao permite processamento concorrente
+                lContinua := .F.
+                If !lAuto
+                    Aviso(STR0159,OemtoAnsi(STR0100),{STR0156},2) // ##"Concorrência"##"Esta Medição está em uso por outra estação."
+                Else
+                    cMedErro := "CN121CONMED: " + STR0100
+                EndIf
+            EndIf
+        EndIf
+        UnLockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
+    EndIf
+
+    CN121Limpa() //--Desativa o model do CNTA121 apó finalização do processo.
+
+    RestArea(aAreaCND)
+    RestArea(aArea)
+
+Return lContinua

@@ -1,0 +1,32 @@
+#INCLUDE "PROTHEUS.CH"
+#INCLUDE "TOPCONN.CH"
+
+/*/{Protheus.doc} TPaymentsIntegracaoSalesforceDTO
+@author Carlos Eduardo (TCP)
+@since 12/07/2024
+@version 1.0
+@description Classe responsavel
+@type Class
+/*/
+
+Class TContratosDTO
+
+    Public Method New() Constructor
+
+EndClass
+
+Method New() Class TContratosDTO
+
+    /*
+        C = Caracter
+        N = Numeric
+        L = Logico
+        V = Variant
+        D = Date - TODO: type Date
+    */
+
+    aDados := {;
+        "recno" :{"type": "N", "allowEmpty": .F.};
+        }
+
+Return(Self)

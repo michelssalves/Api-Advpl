@@ -1,0 +1,16 @@
+﻿#INCLUDE "TOTVS.CH"
+#INCLUDE "TLPP-CORE.TH"
+
+
+Class TErrorClass From ErrorClass
+
+	Public Data cType
+
+	public Method new() constructor
+
+EndClass
+
+Method new(nrow, ncol, nwidth, nheight, bline, aheaders, acolsizes, ownd, cfield, uval1, uval2, bchange, bldblclick, brclick, ofont, ocursor, nclrfore, nclrback, cmsg, uparam20, calias, lpixel, bwhen, uparam24, bvalid, uparam26, uparam27) Class TErrorClass
+	:new(nrow, ncol, nwidth, nheight, bline, aheaders, acolsizes, ownd, cfield, uval1, uval2, bchange, bldblclick, brclick, ofont, ocursor, nclrfore, nclrback, cmsg, uparam20, calias, lpixel, bwhen, uparam24, bvalid, uparam26, uparam27)
+Return self
+

@@ -1,0 +1,114 @@
+#INCLUDE "TOTVS.CH"
+#INCLUDE "FWMVCDEF.CH"
+#INCLUDE "TLPP-CORE.TH"
+#INCLUDE "TLPP-REST.TH"
+
+#DEFINE CRLF (chr(13)+chr(10))
+
+
+/*/{Protheus.doc} TFornecedorIntegracaoSalesforce
+Integracao com salesforce
+@author Carlos Eduardo (TCP)
+@since 26/03/2024
+@Project
+@version 1.0
+@description
+@type Class
+/*/
+
+
+Class TContratosService
+
+    //usado nos metodos de endpoint para codigo e corpo e serão preenchidos nas funções auxiliares
+    private Data nCodigoHttp as integer
+    private Data cCorpoRetorno as character
+    //usado em metodos auxiliares para identificar problemas no processo.
+    private Data lErrorInProcess as logical
+
+    public Method New() Constructor
+
+    @Post("/protheus/:empresa/v1/estornar-medicao/")
+    Public Method EstMedicao()
+
+EndClass
+
+Method New() Class TContratosService
+Return(Self)
+
+Method EstMedicao() Class TContratosService
+
+
+    Private oMedicaoContrato := TMedicaoContrato():New()
+    Private oDTOValidacao      := TContratosDTO():New() 	as Object
+    Private oTwsUtil := TWSUtil():New()
+    Private lSupplierNotFound := .F.
+    Private codCusto := ""
+    Private jPath := jsonObject():New()
+    Private varError := TErrorClass():New()
+    private cBody              := oRest:GetBodyRequest()	as Character
+    private jBody              := JsonObject():New() 		as Json
+    private jCorpoResposta     := JsonObject():New() 		as Json
+
+    //reset control variables
+    self:nCodigoHttp 		:= 0
+    self:cCorpoRetorno 		:= ""
+    self:lErrorInProcess	:= .F.
+
+    TRY
+
+        oTwsUtil:defaultEndpointConfiguration()
+
+        jBody := oTwsUtil:ValidateInput(cBody, oDTOValidacao)
+
+
+        if(oTwsUtil:lError)
+            varError:description := "Erro ao Validar Empresa"
+            varError:cType := "400"
+            throw varError
+        endif
+
+        If(U_EstornarMedicao(JBODY["recno"][1]))
+            TLogConsole():Log("Sucesso ao enviar email do claims..", "TPaymentsIntegracaoSalesforce")
+            self:nCodigoHttp     := 200
+            jCorpoResposta["mensagem"] := "Medição estornada!"
+            self:cCorpoRetorno   := EncodeUTF8(jCorpoResposta:toJSON())
+
+        Else
+            self:nCodigoHttp     := 500
+            jCorpoResposta["mensagem"] := "Não foi possível estornar medição."
+            self:cCorpoRetorno   := EncodeUTF8(jCorpoResposta:toJSON())
+            self:lErrorInProcess := .T.
+
+        EndIf
+
+        if(lSupplierNotFound)
+            self:nCodigoHttp := (204)
+        else
+            self:nCodigoHttp := 200
+            self:cCorpoRetorno := (EncodeUTF8( jCorpoResposta:toJSON() ))
+        endif
+
+    CATCH oException
+
+        Private cClassName := GetClassName(oException)
+
+        TLogConsole():Log(;
+            "Exceção Encontrada - " + oException:description + ". Class Name = " + cClassName;
+            ,"TFornecedorIntegracaoSalesforce";
+            )
+        if(cClassName == "TErrorClass")
+            self:nCodigoHttp := Val(oException:cType)
+        endif
+        if(self:nCodigoHttp == 0)
+            self:nCodigoHttp := int(500)
+        endif
+        jCorpoResposta["mensagem"] = oException:description
+        self:lErrorInProcess := .T.
+        self:cCorpoRetorno := (EncodeUTF8( jCorpoResposta:toJSON() ))
+
+    ENDTRY
+
+    oRest:setStatusCode(self:nCodigoHttp)
+    oRest:setResponse(self:cCorpoRetorno)
+
+Return

@@ -1,0 +1,122 @@
+#INCLUDE "TOTVS.CH"
+#INCLUDE "FWMVCDEF.CH"
+#INCLUDE "TLPP-CORE.TH"
+#INCLUDE "TLPP-REST.TH"
+
+Class TWSUtil
+    Public Data lError
+    Public Data cError
+    Public Data cTypeError
+
+    Public Method New() Constructor
+
+    Public Method defaultEndpointConfiguration()
+    Public Method ValidateInput(cBody, TDtoClass)
+
+Endclass
+
+Method New() Class TwsUtil
+return Self
+Method defaultEndpointConfiguration() Class TWSUtil
+    TLogConsole():Log(;
+        "Metodo defaultEndpointConfiguration Classe TWSUtil" ;
+        , "TWSUtil";
+        )
+    Private jPath := JsonObject():new() as Json
+    Private cCgcEmpresa as Character
+    Private oTPrepEnv := TPrepEnv():new() as Object
+    Private cBody := oRest:GetBodyRequest()
+
+    self:lError := .F.
+    self:cError := ""
+    self:cTypeError := ""
+
+    oRest:setKeyHeaderResponse("Content-Type", "application/json; charset=UTF-8")
+
+    jPath := oRest:getPathParamsRequest()
+
+    //se tem parametros no Path, valida empresa
+    if jPath <> Nil .And. !empty(jPath[ 'empresa'])
+        TLogConsole():Log(;
+            "Carregando Empresa:" + jPath['empresa'] ;
+            , "TWSUtil";
+            )
+        cCgcEmpresa := jPath[ 'empresa']
+        oTPrepEnv:PrepEnvCgc(cCgcEmpresa)
+
+    elseif !empty(cBody)
+        Private jBody := JsonObject():New()
+        Private cResultBody := jBody:FromJson(cBody)
+        if valType(cResultBody) != 'U' .And. !empty(jBody["COMPANY"]) .And. !empty(jBody["BRANCH"])
+            oTPrepEnv:PrepEnv(jBody["COMPANY"], jBody["BRANCH"], jBody["MODULE"])
+        endif
+    else
+        self:lError := .T.
+        self:cError := "Parametros para configuração do ambiente não registrados"
+        self:cTypeError := "400"
+    endif
+    //aqui só entra se tiver erro no PrepEnv e não tiver erro no self(validação padrão)
+    if !self:lError .and. !oTPrepEnv:lReturn
+        self:lError := .T.
+        self:cError := oTPrepEnv:cMsg
+        self:cTypeError := "400"
+    endif
+Return !self:lError
+
+Method ValidateInput(cBody, oDTOValidacao) Class TWSUtil
+    TLogConsole():Log(;
+        "Metodo ValidateInput Classe TWsUtil ", ;
+        "TWsUtil";
+        )
+
+    Private cRetornoConversaoJSON
+    Private jBody := JsonObject():new()
+    Private oDto := tDto():new()
+    Private varError := TErrorClass():new()
+    Try
+        If empty(cBody)
+            varError:description := "Corpo Está vazio"
+            varError:cType := "400"
+            throw varError
+        endif
+
+        TLogConsole():Log(;
+            "cBody not empty" ;
+            , "TWsUtil";
+            )
+        cRetornoConversaoJSON := jBody:FromJson(cBody)
+
+        if (valType(cRetornoConversaoJSON) <> "U")
+            varError:description := "Falha ao popular JsonObject. Erro: " + cRetornoConversaoJSON
+            varError:cType := "400"
+            throw varError
+        endif
+
+        TLogConsole():Log(;
+            "cBody Converted to jBody " ;
+            , "TWsUtil";
+            )
+        /*
+		If !oDto:dto(jBody, oDTOValidacao:Campos)
+			TLogConsole():Log(;
+				"Problema na validação dos dados. Erro: " + oDto:Mensagem ;
+				, "TWsUtil";
+				)
+			varError:description := oDto:Mensagem
+			varError:cType := "400"
+			throw varError
+		endif
+        */
+    Catch oException
+        if GetClassName(oException) == "TErrorClass"
+            self:cTypeError := oException:cType
+        else
+            self:cTypeError := "500"
+        endif
+        self:cError := oException:description
+        self:lError := .T.
+    EndTry
+
+
+Return jBody
+

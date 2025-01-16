@@ -11,13 +11,13 @@
 
 User Function TestEstornarMe()
 
-    RpcClearenv()
-    RPCSetType(3)
-    RpcSetEnv('02')
+	RpcClearenv()
+	RPCSetType(3)
+	RpcSetEnv('02')
 
-    U_EstornarMedicao()
+	U_EstornarMedicao()
 
-    RpcClearEnv()
+	RpcClearEnv()
 
 Return
 //------------------------------------------------------------------
@@ -27,88 +27,87 @@ Estorna Medição
 @since 03/09/2015
 /*/
 //-------------------------------------------------------------------
-User Function EstornarMedicao(lAuto,lAprRev,cMedErro)
+User Function EstornarMedicao(nRecno)
 
-    Local aArea     := GetArea()
-    Local aAreaCND  := CND->(GetArea())
-    Local lAutForn	:= .T.
-    Local lContinua	:= .T.
-    Local cChave	:= ""
-    Local cFilCNA	:= xFilial("CNA")
-    Local cFilCXN	:= xFilial("CXN")
-    Local nReg		AS Numeric
-    Local bBloco	:= Nil
-    // Local oModel    := Nil
-    Default lAuto	:= .F.
-    Default lAprRev := .F.
-    Default cMedErro:= ""
+	Local aArea     := GetArea()
+	Local aAreaCND  := CND->(GetArea())
+	Local lAutForn	:= .T.
+	Local lContinua	:= .T.
+	Local cChave	:= ""
+	Local cFilCNA	:= xFilial("CNA")
+	Local cFilCXN	:= xFilial("CXN")
+	Local nReg		AS Numeric
+	Local bBloco	:= Nil
+	Default lAuto	:= .F.
+	Default lAprRev := .F.
+	Default cMedErro:= ""
 
-    // oModel := FwLoadModel('CNTA121')
-    // //oModel:GetOperation() == MODEL_OPERATION_UPDATE
-    // oModel:SetOperation(MODEL_OPERATION_UPDATE)
-    // lContinua := oModel:Activate()
+	CND->(DbGoto(nRecno))
 
-    CND->(DbGoto(44965))
+	nReg		:= CND->(Recno())
+	lAutForn    := CND->CND_AUTFRN == "2"
 
-    nReg		:= CND->(Recno())
-    lAutForn    := CND->CND_AUTFRN == "2"
+	TLogConsole():Log(;
+		"Call Endpoint  - /protheus/fornecedor/v1/novo";
+		, "TPaymentsIntegracaoSalesforce";
+		)
 
-    If lContinua
+	If lContinua
 
-        lContinua := VldEstorMd(lAprRev, @cMedErro, lAuto)
+		lContinua := VldEstorMd(lAprRev, @cMedErro, lAuto)
 
-        //- Verifica se é contrato recorrente e se é a última medição efetuada
-        CXN->(dbSetOrder(1))
-        CNA->(dbSetOrder(1))
-        CXN->(dbSeek(cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)))
-        While !CXN->(Eof()) .And. CXN->(CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED) == cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
-            If CXN->CXN_CHECK
-                If CNA->(MsSeek(cFilCNA+CND->(CND_CONTRA+CND_REVISA)+CXN->CXN_NUMPLA))
-                    //- Se a medição a ser excluída não é a última, não permite exclusão
-                    If !Empty(CNA->CNA_PERIOD) .And. !Empty(CNA->CNA_RECMED) .And. ( CNA->CNA_RECMED <> CND->CND_NUMMED  )
-                        lContinua := .F.
-                        Help(" ",1,"CN121BLQREC") // "Exclusões de medições de contratos recorrentes serão permitidas na ordem inversa da que foram incluídas, a partir da última medição.")
-                        cMsgErro := "CN121BLQREC: "
-                        Exit
-                    Endif
-                Endif
-            Endif
-            CXN->(dbSkip())
-        EndDo
+		//- Verifica se é contrato recorrente e se é a última medição efetuada
+		CXN->(dbSetOrder(1))
+		CNA->(dbSetOrder(1))
+		CXN->(dbSeek(cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)))
+		While !CXN->(Eof()) .And. CXN->(CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED) == cFilCXN+CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
+			If CXN->CXN_CHECK
+				If CNA->(MsSeek(cFilCNA+CND->(CND_CONTRA+CND_REVISA)+CXN->CXN_NUMPLA))
+					//- Se a medição a ser excluída não é a última, não permite exclusão
+					If !Empty(CNA->CNA_PERIOD) .And. !Empty(CNA->CNA_RECMED) .And. ( CNA->CNA_RECMED <> CND->CND_NUMMED  )
+						lContinua := .F.
+						Help(" ",1,"CN121BLQREC") // "Exclusões de medições de contratos recorrentes serão permitidas na ordem inversa da que foram incluídas, a partir da última medição.")
+						cMsgErro := "CN121BLQREC: "
+						Exit
+					Endif
+				Endif
+			Endif
+			CXN->(dbSkip())
+		EndDo
 
-        cChave := CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
-        If LockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
-            If lContinua
-                //Chama rotina de estorno por meio de processo
-                If lAutForn
-                    bBloco := {|| lContinua := Cn121AutEst(nReg,!lAuto) }
-                Else
-                    bBloco	:= IIF(lAuto, {|| lContinua := CN121MedEst(nReg,!lAuto,,,lAprRev,@cMedErro) }, {|| lContinua := CN121MedEst(nReg,!lAuto) })
-                EndIf
+		cChave := CND->(CND_CONTRA+CND_REVISA+CND_NUMMED)
+		If LockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
+			If lContinua
+				//Chama rotina de estorno por meio de processo
+				If lAutForn
+					bBloco := {|| lContinua := Cn121AutEst(nReg,!lAuto) }
+				Else
+					bBloco	:= IIF(lAuto, {|| lContinua := CN121MedEst(nReg,!lAuto,,,lAprRev,@cMedErro) }, {|| lContinua := CN121MedEst(nReg,!lAuto) })
+				EndIf
 
-                If lAuto
-                    Eval(bBloco)
-                Else
-                    Processa(bBloco)
-                Endif
-            EndIf
-        Else
-            // Nao permite processamento concorrente
-            lContinua := .F.
-            If !lAuto
+				If lAuto
+					Eval(bBloco)
+				Else
+					Processa(bBloco)
+				Endif
+			EndIf
+		Else
+			// Nao permite processamento concorrente
+			lContinua := .F.
+			If !lAuto
 
-            Else
-                cMedErro := "CN121CONMED: "
-            EndIf
-        EndIf
-    EndIf
+			Else
+				cMedErro := "CN121CONMED: "
+			EndIf
+		EndIf
+	EndIf
 
-    UnLockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
+	UnLockByName("CN120"+xFilial("CND")+cChave,.T.,!Empty(xFilial("CND")),.T.)
 
-    CN121Limpa() //--Desativa o model do CNTA121 apó finalização do processo.
+	CN121Limpa() //--Desativa o model do CNTA121 apó finalização do processo.
 
-    RestArea(aAreaCND)
-    RestArea(aArea)
+	RestArea(aAreaCND)
+	RestArea(aArea)
 
 Return lContinua
 
@@ -123,109 +122,109 @@ e saldo do contrato, planilhas e cronogramas
 //-------------------------------------------------------------------
 Static Function CN121MedEst(nReg,lAviso,lAutoFor,lMedServ,lAprRev,cMedErro)
 
-Local cFilCtr		:= cFilAnt
+	Local cFilCtr		:= cFilAnt
 
-Local cFilCNS 		:= xFilial("CNS",cFilCTR)
-Local cRetPrf		:= PadR(SuperGetMV("MV_CNPREMD",.F.,"MED"),TAMSX3("E2_PREFIXO")[1])
-Local cTpTit		:= PadR(SuperGetMV("MV_CNTPTMD",.F.,"BOL"),TAMSX3("E2_TIPO")[1])
-Local cLoteGCT  	:= LoteCont("COM")  //-- Numero do Lote
-Local cQuery   		:= ""
-Local cCronog  		:= ""
-Local cEspCtr  		:= ""
-Local cParcel		:= ""
-Local cAliasCNT		:= ""
+	Local cFilCNS 		:= xFilial("CNS",cFilCTR)
+	Local cRetPrf		:= PadR(SuperGetMV("MV_CNPREMD",.F.,"MED"),TAMSX3("E2_PREFIXO")[1])
+	Local cTpTit		:= PadR(SuperGetMV("MV_CNTPTMD",.F.,"BOL"),TAMSX3("E2_TIPO")[1])
+	Local cLoteGCT  	:= LoteCont("COM")  //-- Numero do Lote
+	Local cQuery   		:= ""
+	Local cCronog  		:= ""
+	Local cEspCtr  		:= ""
+	Local cParcel		:= ""
+	Local cAliasCNT		:= ""
 
-Local cNumTit		:= ""
-Local cArqGCT 		:= ""
-Local cLancCont		:= ""
-Local cBusca		:= ""
-Local cChaveCXN		:= ""
-Local cChaveCNE		:= ""
-Local cChaveCNZ		:= ""
-Local cChaveCXJ		:= ""
-Local cOrigem		:= FunName()
+	Local cNumTit		:= ""
+	Local cArqGCT 		:= ""
+	Local cLancCont		:= ""
+	Local cBusca		:= ""
+	Local cChaveCXN		:= ""
+	Local cChaveCNE		:= ""
+	Local cChaveCNZ		:= ""
+	Local cChaveCXJ		:= ""
+	Local cOrigem		:= FunName()
 
-Local nTpDoc		:= "" //Verifica quais documentos foram gerados Pedidos/Titulos
-Local nTamVlTot		:= TamSX3("CND_VLTOT")[2]
-Local nTipo    		:= 1 	//-- 1 - Medicao;2 - Autorizacao de Fornecimento
-Local nServico 		:= 1 	//-- 1 - Medicao;2 - Medicao de Servico
-Local nDet 			:= 0    //-- Retorno da funcao DetProva
-Local nTaxa			:= 0
-Local nHead			:= 0
-Local nX			:= 0
-Local nI			:= 0
-Local nValExced		:= 0
-Local nLp69B		:= 0
-Local nLp69I		:= 0
-Local lAutForn := .T.
-Local lCriaProv		:= AllTrim(SuperGetMV("MV_CNTPPP" ,.F.,"0")) $ "0/1"  // define quando os contratos recorrentes serão provisionados
-Local lVldVige 		:= GetNewPar("MV_CNFVIGE","N") == "N"
-Local lTitProv		:= GetNewPar("MV_CNPROVI","S") == "S"
-Local lPeSld   		:= ExistBlock("CN121ELD")
-Local lCN121EPM 	:= ExistBlock("CN121EPM")
-Local lRecorre		:= .F.
-Local lMedEve  		:= .F.
-Local lFisico  		:= .F.
-Local lSemiFix		:= .F.
-Local lValor   		:= .T.
-Local lFixo    		:= .T.
-Local lRet     		:= .T.
-Local lEstSld		:= .T.
-Local lDigita 		:= .F.    	//-- Mostra lancamento?
-Local lAglutina		:= .F.    	//-- Aglutina
-Local lMedComPlan 	:= .F.
-Local lUsaFlag		:= SuperGetMV( "MV_CTBFLAG" , .T. /*lHelp*/, .F. /*cPadrao*/)
-Local lCtbCNE		:= .F.
-Local lCtbOnLine	:= .F.
-Local aFlagCTB 		:= {}
-Local dDtFim		:= dDataBase
-Local aDocuments	:= {}
-Local aLPGCT		:= {{"697",VerPadrao("697")},; //-- LP Gestão de Contratos - Encerramento da Medição
-						{"698",VerPadrao("698")},; //-- LP Gestão de Contratos - Encerramento da Medição/Automatico
-						{"699",VerPadrao("699")},; //-- LP Gestão de Contratos - Encer. Medicao: Itens do Contrato
-						{"69A",VerPadrao("69A")},; //-- LP Gestão de Contratos - Est. Medicao: Itens do Contrato
-						{"69B",VerPadrao("69B")},; //-- LP Gestão de Contratos - Incl. Rateio Itens Contrato s/ Planilha
-						{"69C",VerPadrao("69C")},; //-- LP Gestão de Contratos - Excl. Rateio Itens Contrato s/ Planilha
-						{"69D",VerPadrao("69D")},; //-- LP Gestão de Contratos - Incl. Rateio Itens Contrato c/ Planilha
-						{"69E",VerPadrao("69E")},;
-						{"69F",VerPadrao("69F")},; //LP Gestão de Contratos - Excl. Rateio Itens Contrato c/ Planilha
-						{"69H",VerPadrao("69H")},; //LP Gestão de Contratos - Encerramento da medição por item norma IFRS 15 (bens e serviços)
-						{"69I",VerPadrao("69I")}; //LP Gestão de Contratos - Estorno da medição por item norma IFRS 15 (bens e serviços)
-					}
+	Local nTpDoc		:= "" //Verifica quais documentos foram gerados Pedidos/Titulos
+	Local nTamVlTot		:= TamSX3("CND_VLTOT")[2]
+	Local nTipo    		:= 1 	//-- 1 - Medicao;2 - Autorizacao de Fornecimento
+	Local nServico 		:= 1 	//-- 1 - Medicao;2 - Medicao de Servico
+	Local nDet 			:= 0    //-- Retorno da funcao DetProva
+	Local nTaxa			:= 0
+	Local nHead			:= 0
+	Local nX			:= 0
+	Local nI			:= 0
+	Local nValExced		:= 0
+	Local nLp69B		:= 0
+	Local nLp69I		:= 0
+	// Local lAutForn := .T.
+	Local lCriaProv		:= AllTrim(SuperGetMV("MV_CNTPPP" ,.F.,"0")) $ "0/1"  // define quando os contratos recorrentes serão provisionados
+	Local lVldVige 		:= GetNewPar("MV_CNFVIGE","N") == "N"
+	Local lTitProv		:= GetNewPar("MV_CNPROVI","S") == "S"
+	Local lPeSld   		:= ExistBlock("CN121ELD")
+	Local lCN121EPM 	:= ExistBlock("CN121EPM")
+	Local lRecorre		:= .F.
+	Local lMedEve  		:= .F.
+	Local lFisico  		:= .F.
+	Local lSemiFix		:= .F.
+	Local lValor   		:= .T.
+	Local lFixo    		:= .T.
+	Local lRet     		:= .T.
+	Local lEstSld		:= .T.
+	Local lDigita 		:= .F.    	//-- Mostra lancamento?
+	Local lAglutina		:= .F.    	//-- Aglutina
+	Local lMedComPlan 	:= .F.
+	Local lUsaFlag		:= SuperGetMV( "MV_CTBFLAG" , .T. /*lHelp*/, .F. /*cPadrao*/)
+	Local lCtbCNE		:= .F.
+	Local lCtbOnLine	:= .F.
+	Local aFlagCTB 		:= {}
+	Local dDtFim		:= dDataBase
+	Local aDocuments	:= {}
+	Local aLPGCT		:= {{"697",VerPadrao("697")},; //-- LP Gestão de Contratos - Encerramento da Medição
+		{"698",VerPadrao("698")},; //-- LP Gestão de Contratos - Encerramento da Medição/Automatico
+		{"699",VerPadrao("699")},; //-- LP Gestão de Contratos - Encer. Medicao: Itens do Contrato
+		{"69A",VerPadrao("69A")},; //-- LP Gestão de Contratos - Est. Medicao: Itens do Contrato
+		{"69B",VerPadrao("69B")},; //-- LP Gestão de Contratos - Incl. Rateio Itens Contrato s/ Planilha
+		{"69C",VerPadrao("69C")},; //-- LP Gestão de Contratos - Excl. Rateio Itens Contrato s/ Planilha
+		{"69D",VerPadrao("69D")},; //-- LP Gestão de Contratos - Incl. Rateio Itens Contrato c/ Planilha
+		{"69E",VerPadrao("69E")},;
+		{"69F",VerPadrao("69F")},; //LP Gestão de Contratos - Excl. Rateio Itens Contrato c/ Planilha
+		{"69H",VerPadrao("69H")},; //LP Gestão de Contratos - Encerramento da medição por item norma IFRS 15 (bens e serviços)
+		{"69I",VerPadrao("69I")}; //LP Gestão de Contratos - Estorno da medição por item norma IFRS 15 (bens e serviços)
+		}
 
-DEFAULT lAviso 		:= .T.
-DEFAULT lAutoFor	:= .T.
-DEFAULT lMedServ	:= .F.
-DEFAULT lAprRev		:= .F.
+	DEFAULT lAviso 		:= .T.
+	DEFAULT lAutoFor	:= .T.
+	DEFAULT lMedServ	:= .F.
+	DEFAULT lAprRev		:= .F.
 
-CUSERNAME := "Administrador"
-_CUSERID := "000000"
-NMODULO := 2
+	CUSERNAME := "Administrador"
+	__CUSERID := "000000"
+	NMODULO := 2
 
-CND->(DbGoto(44965))
+	CND->(DbGoto(nReg))
 
-nTpDoc		:= CN120VerDoc(CND->CND_NUMMED) 
+	nTpDoc		:= CN120VerDoc(CND->CND_NUMMED)
 
-lMsErroAuto := Iif(Type("lMsErroAuto")=='L',lMsErroAuto,.F.)
+	lMsErroAuto := Iif(Type("lMsErroAuto")=='L',lMsErroAuto,.F.)
 
-//-- Ponto de entrada para indicar se atualiza ou nao saldo da medicao no estorno
-If ExistBlock("CN121ASD")
-	lEstSld := ExecBlock("CN121ASD",.F.,.F.)
-	If ValType(lEstSld) <> "L"
-		lEstSld := .T.
+	//-- Ponto de entrada para indicar se atualiza ou nao saldo da medicao no estorno
+	If ExistBlock("CN121ASD")
+		lEstSld := ExecBlock("CN121ASD",.F.,.F.)
+		If ValType(lEstSld) <> "L"
+			lEstSld := .T.
+		EndIf
 	EndIf
-EndIf
 
-//-- Estabelece passos
-ProcRegua(6)
+	//-- Estabelece passos
+	ProcRegua(6)
 
-If !lAutoFor .Or. !lMedServ
-	lRet := CN240VldUsr(CND->CND_CONTRA,DEF_TRAEST_MED,.T.,,cFilCtr)
-EndIf
+	If !lAutoFor .Or. !lMedServ
+		lRet := CN240VldUsr(CND->CND_CONTRA,DEF_TRAEST_MED,.T.,,cFilCtr)
+	EndIf
 
-Pergunte("CNT120",.F.)	//-- Carrega as variaveis
+	Pergunte("CNT120",.F.)	//-- Carrega as variaveis
 
-If (lCtbOnLine := IIf(ValType(MV_PAR01)=="N",MV_PAR01 == 1,.F.))//SE CONTABILIZA, atraves da escolha do usuario
+	If (lCtbOnLine := IIf(ValType(MV_PAR01)=="N",MV_PAR01 == 1,.F.))//SE CONTABILIZA, atraves da escolha do usuario
 	//Percorre os lancamentos contabeis do GCT, se algum deles existir, a contabilizacao podera ter continuidade
 	For nI := 1 to len(aLPGCT)
 		If aLPGCT[nI,2]
@@ -245,97 +244,97 @@ If (lCtbOnLine := IIf(ValType(MV_PAR01)=="N",MV_PAR01 == 1,.F.))//SE CONTABILIZA
 			lCtbOnLine := .F.
 		EndIf
 	EndIf
-Endif
+	Endif
 
-If lRet
-	If !Empty(CND->CND_DTFIM) .Or. lAutoFor
-		nTipo 	:= Iif(lAutoFor,2,1)
-		nServico:= Iif(lMedServ,2,1)
+	If lRet
+		If !Empty(CND->CND_DTFIM) .Or. lAutoFor
+			nTipo 	:= Iif(lAutoFor,2,1)
+			nServico:= Iif(lMedServ,2,1)
 
-		CN9->(dbSetOrder(1)) //-- CN9_FILIAL+CN9_NUMERO+CN9_REVISA
-		CN9->(dbSeek(xFilial("CN9",cFilCTR)+CND->CND_CONTRA+"ZZZ",.T.)) //-- Posiciona na revisao atual do contrato
-		CN9->(dbSkip(-1))
-		//-- So permite o estorno se o contrato estiver fora das seguintes situacoe contrato finalizado ou fora do período da vigência
-		If lVldVige .And.((CN9->CN9_SITUAC==DEF_SFINA) .Or. (CN9->CN9_DTINIC > dDataBase .Or. CN9->CN9_DTFIM < dDataBase))
-			lRet := .F.
-			Help( " ", 1, "CNTA120_07" )	//-- Contrato fora do periodo de vigencia
-			cMedErro := ""	
-		EndIf
-
-		If lRet .And. CN9->CN9_SITUAC==DEF_SFINA
-			lRet := .F.
-			Help("",1,"",,'',4,1)		//-- Ação não disponível para contrato Finalizado
-			cMedErro := ''					//-- Ação não disponível para contrato Finalizado
-	 	EndIF
-
-		If lRet .And. CN9->CN9_SITUAC==DEF_SCANC
-			lRet := .F.
-			Help('',1,"CNTA120_10")	//-- Ação não disponível para contrato Cancelado
-			cMedErro := "" 	//-- Ação não disponível para contrato Cancelado
-		EndIf
-
-		If lRet .And. !lAprRev .And. CN9->CN9_SITUAC==DEF_SREVS
-			lRet := .F.
-			Help('',1,"CNTA120_11")	//-- Ação não disponível para contrato com Revisão em Aberto
-			cMedErro := ""		//-- Ação não disponível para contrato com Revisão em Aberto
-		EndIf
-
-		If lRet .And. (CN9->CN9_REVISA <> CND->CND_REVISA) //-- Verifica se a revisao da medição é a revisão atual
-			lRet := .F.
-			Help('',1,"CNTA120_12")	//-- Estorno não permitido para revisões anteriores.
-			cMedErro := ""		//-- Estorno não permitido para revisões anteriores.
-		EndIf
-
-		If lRet .And. nModulo <> 28
-			DbSelectArea("TFJ")
-			TFJ->(DbSetOrder(5)) //-- TFJ_FILIAL+TFJ_CONTRT+TFJ_CONREV
-			If TFJ->(dbSeek(xFilial("TFJ")+CN9->(CN9_NUMERO+CN9_REVISA))) .And. Cn120IsMdGS(CND->CND_NUMMED)
+			CN9->(dbSetOrder(1)) //-- CN9_FILIAL+CN9_NUMERO+CN9_REVISA
+			CN9->(dbSeek(xFilial("CN9",cFilCTR)+CND->CND_CONTRA+"ZZZ",.T.)) //-- Posiciona na revisao atual do contrato
+			CN9->(dbSkip(-1))
+			//-- So permite o estorno se o contrato estiver fora das seguintes situacoe contrato finalizado ou fora do período da vigência
+			If lVldVige .And.((CN9->CN9_SITUAC==DEF_SFINA) .Or. (CN9->CN9_DTINIC > dDataBase .Or. CN9->CN9_DTFIM < dDataBase))
 				lRet := .F.
-				Help(" ",1,"CNTA120TEC")	//-- Acao disponivel apenas para contratos sem vinculos com Gestão de Serviços
+				Help( " ", 1, "CNTA120_07" )	//-- Contrato fora do periodo de vigencia
+				cMedErro := ""
 			EndIf
-		EndIf
 
-		If lRet .And. !Empty(CND->CND_RETCAC)
-			//-- Verifica se existe retencao para a medicao e se
-			//-- a mesma se encontra baixada
-			cQuery := " SELECT COUNT(*) AS RETQTD "
-			cQuery += " FROM "+RetSQLName("CNT")+" CNT"
-			cQuery += " WHERE CNT.CNT_FILIAL = '"+xFilial("CNT",cFilCTR)+"'"
-			cQuery += " AND CNT.CNT_CONTRA = '"+CND->CND_CONTRA+"'"
-			cQuery += " AND CNT.CNT_NUMMED = '"+CND->CND_NUMMED+"'"
-			cQuery += " AND CNT.CNT_VLBX   > 0"
-			cQuery += " AND D_E_L_E_T_ = ' '"
+			If lRet .And. CN9->CN9_SITUAC==DEF_SFINA
+				lRet := .F.
+				Help("",1,"",,'',4,1)		//-- Ação não disponível para contrato Finalizado
+				cMedErro := ''					//-- Ação não disponível para contrato Finalizado
+			EndIF
 
-			cAliasCNT := GetNextAlias()
-			cQuery := ChangeQuery(cQuery)
-			dbUseArea(.T.,"TOPCONN",TcGenQry(,,cQuery),cAliasCNT,.F.,.T.)
-			lRet := ((cAliasCNT)->RETQTD == 0)
-			(cAliasCNT)->(dbCloseArea())
-
-			If !lRet
-				Help( " ", 1, "CNTA120_05")//-- A medição não pode ser estornada, pois o valor de retenção da caução já foi baixado"
+			If lRet .And. CN9->CN9_SITUAC==DEF_SCANC
+				lRet := .F.
+				Help('',1,"CNTA120_10")	//-- Ação não disponível para contrato Cancelado
+				cMedErro := "" 	//-- Ação não disponível para contrato Cancelado
 			EndIf
-		EndIf
 
-		Begin Transaction
+			If lRet .And. !lAprRev .And. CN9->CN9_SITUAC==DEF_SREVS
+				lRet := .F.
+				Help('',1,"CNTA120_11")	//-- Ação não disponível para contrato com Revisão em Aberto
+				cMedErro := ""		//-- Ação não disponível para contrato com Revisão em Aberto
+			EndIf
 
-			If lRet
-				//Valida se a medição é de excedente para competência não prevista
-				If GCTExcedNP(CND->CND_NUMMED)
-					SetExcedNP(.T.)
+			If lRet .And. (CN9->CN9_REVISA <> CND->CND_REVISA) //-- Verifica se a revisao da medição é a revisão atual
+				lRet := .F.
+				Help('',1,"CNTA120_12")	//-- Estorno não permitido para revisões anteriores.
+				cMedErro := ""		//-- Estorno não permitido para revisões anteriores.
+			EndIf
+
+			If lRet .And. nModulo <> 28
+				DbSelectArea("TFJ")
+				TFJ->(DbSetOrder(5)) //-- TFJ_FILIAL+TFJ_CONTRT+TFJ_CONREV
+				If TFJ->(dbSeek(xFilial("TFJ")+CN9->(CN9_NUMERO+CN9_REVISA))) .And. Cn120IsMdGS(CND->CND_NUMMED)
+					lRet := .F.
+					Help(" ",1,"CNTA120TEC")	//-- Acao disponivel apenas para contratos sem vinculos com Gestão de Serviços
 				EndIf
-	
-				cChaveCXN := xFilial("CXN")+CND->CND_CONTRA+CND->CND_REVISA+CND->CND_NUMMED
-				CXN->(DbSetOrder(1)) //-- CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED+CXN_NUMPLA
-				CXN->(DbSeek(xFilial("CXN")+CND->CND_CONTRA+CND->CND_REVISA+CND->CND_NUMMED))
-	
+			EndIf
+
+			If lRet .And. !Empty(CND->CND_RETCAC)
+				//-- Verifica se existe retencao para a medicao e se
+				//-- a mesma se encontra baixada
+				cQuery := " SELECT COUNT(*) AS RETQTD "
+				cQuery += " FROM "+RetSQLName("CNT")+" CNT"
+				cQuery += " WHERE CNT.CNT_FILIAL = '"+xFilial("CNT",cFilCTR)+"'"
+				cQuery += " AND CNT.CNT_CONTRA = '"+CND->CND_CONTRA+"'"
+				cQuery += " AND CNT.CNT_NUMMED = '"+CND->CND_NUMMED+"'"
+				cQuery += " AND CNT.CNT_VLBX   > 0"
+				cQuery += " AND D_E_L_E_T_ = ' '"
+
+				cAliasCNT := GetNextAlias()
+				cQuery := ChangeQuery(cQuery)
+				dbUseArea(.T.,"TOPCONN",TcGenQry(,,cQuery),cAliasCNT,.F.,.T.)
+				lRet := ((cAliasCNT)->RETQTD == 0)
+				(cAliasCNT)->(dbCloseArea())
+
+				If !lRet
+					Help( " ", 1, "CNTA120_05")//-- A medição não pode ser estornada, pois o valor de retenção da caução já foi baixado"
+				EndIf
+			EndIf
+
+			Begin Transaction
+
+				If lRet
+					//Valida se a medição é de excedente para competência não prevista
+					If GCTExcedNP(CND->CND_NUMMED)
+						SetExcedNP(.T.)
+					EndIf
+
+					cChaveCXN := xFilial("CXN")+CND->CND_CONTRA+CND->CND_REVISA+CND->CND_NUMMED
+					CXN->(DbSetOrder(1)) //-- CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED+CXN_NUMPLA
+					CXN->(DbSeek(xFilial("CXN")+CND->CND_CONTRA+CND->CND_REVISA+CND->CND_NUMMED))
+
 					While CXN->(!EOF()) .And. cChaveCXN == CXN->(CXN_FILIAL+CXN_CONTRA+CXN_REVISA+CXN_NUMMED)
-					//- Aqui processa cada registro da CXN
+						//- Aqui processa cada registro da CXN
 						If !(CXN->CXN_CHECK)
 							CXN->(DbSkip())
 							Loop
 						EndIf
-	
+
 						//-- Encerramento de planilhas zeradas
 						If CXN->(Columnpos('CXN_ZERO')) > 0
 							If CXN->CXN_ZERO == '1'
@@ -344,7 +343,7 @@ If lRet
 								Loop
 							EndIf
 						EndIf
-	
+
 						//- Caracteristicas do contrato pelo tipo de planilha
 						cEspCtr := Cn300RetSt("ESPECIE",	0,CXN->CXN_NUMPLA,CXN->CXN_CONTRA)
 						lMedEve := Cn300RetSt("MEDEVE",		0,CXN->CXN_NUMPLA,CXN->CXN_CONTRA)
@@ -355,10 +354,10 @@ If lRet
 						lRecorre:= Cn300RetSt("RECORRENTE",	0,CXN->CXN_NUMPLA,CXN->CXN_CONTRA)
 						lSemiFix:= Cn300RetSt("SEMIFIXO",	0,CXN->CXN_NUMPLA,CXN->CXN_CONTRA)
 						lServico:= Cn300RetSt('SERVIÇO',	0,CXN->CXN_NUMPLA,CXN->CXN_CONTRA)
-	
+
 						//Valor total dos itens excedentes da planilha
 						nValExced := CN120VlExc(CND->CND_CONTRA,CND->CND_REVISA,CND->CND_NUMMED,CXN->CXN_NUMPLA)
-	
+
 						//- Busca parcela do cronograma
 						If lRet .And. !Empty(CXN->CXN_CRONOG)
 							cCronog := CXN->CXN_CRONOG
@@ -367,14 +366,14 @@ If lRet
 								nTaxa := CNF->CNF_TXMOED
 							EndIf
 						EndIf
-	
+
 						PcoIniLan("000355")
-	
+
 						//- Busca documentos da medição
 						cChaveCXJ := xFilial("CXJ")+CND->(CND_CONTRA+CND_NUMMED)+CXN->CXN_NUMPLA
 						CXJ->(DbSetOrder(1)) //-- CXJ_FILIAL+CXJ_CONTRA+CXJ_NUMMED+CXJ_NUMPLA+CXJ_ITEMPL+CXJ_PRTENV+CXJ_ID
 						CXJ->(MsSeek(cChaveCXJ))
-	
+
 						//-- Verificando documentos da medição
 						While CXJ->(!EOF()) .And. cChaveCXJ == CXJ->(CXJ_FILIAL+CXJ_CONTRA+CXJ_NUMMED+CXJ_NUMPLA)
 							lFind:=  aScan(aDocuments,{|x| x[2] == CXJ->CXJ_NUMPED }) > 0  .Or.  aScan(aDocuments,{|x| x[2] == CXJ->CXJ_NUMTIT }) > 0
@@ -393,21 +392,21 @@ If lRet
 									EndIf
 								EndIf
 							EndIf
-	
+
 							CXJ->(dbSkip())
 						EndDo
-	
+
 						If lRet
 							dDtFim := CND->CND_DTFIM
-	
+
 							PcoDetLan("000355","03","CNTA120",.T.)	//-- Ponto de lancamento contabil e orcamentario para estorno da medicao
-	
+
 							If lRet .And. lCtbOnLine
-						    	nDet += DetProva(nHead,"699","CNTA121",cLoteGCT,,,,,,,,,{"CND",CND->(RECNO())})
+								nDet += DetProva(nHead,"699","CNTA121",cLoteGCT,,,,,,,,,{"CND",CND->(RECNO())})
 							EndIf
-	
+
 							//-- Atualizando Medição e Itens
-	
+
 							//- Atualiza saldo da planilha se tipo de contato/planilha é fixa
 							If ( (lFixo .Or. lSemiFix) .And. !lRecorre) .Or. (lValor .And. !lRecorre)	 //-- Atualiza saldo da planilha
 								CNA->(dbSetOrder(1))
@@ -419,24 +418,24 @@ If lRet
 									EndIf
 								EndIf
 							EndIf
-	
+
 							//- Atualiza saldo do contrato se tipo de contrato/planilha é fixo
 							CN9->(dbSetorder(1))
 							If CN9->(dbSeek(xFilial("CN9",cFilCTR)+CND->CND_CONTRA+CND->CND_REVISA))
 								If lEstSld .And. !lPeSld
 									RecLock("CN9",.F.)
-										If ( (lFixo .Or. lSemiFix) .And. !lRecorre) .Or. (lValor .And. !lRecorre)
-											CN9->CN9_SALDO += xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
-										ElseIf !lRecorre
-											CN9->CN9_VLATU -= xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)		//Atualiza valor do contrato
-											If Empty(CN9->CN9_REVISA)//Se contrato original atualiza valor inicial
-												CN9->CN9_VLINI -= xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
-											EndIf
+									If ( (lFixo .Or. lSemiFix) .And. !lRecorre) .Or. (lValor .And. !lRecorre)
+										CN9->CN9_SALDO += xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
+									ElseIf !lRecorre
+										CN9->CN9_VLATU -= xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)		//Atualiza valor do contrato
+										If Empty(CN9->CN9_REVISA)//Se contrato original atualiza valor inicial
+											CN9->CN9_VLINI -= xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
 										EndIf
+									EndIf
 									MsUnlock()
 								EndIf
 							EndIf
-	
+
 							//- localiza e atualiza valores da parcela do cronograma se não é eventual
 							If !lMedeve .And. !lRecorre //-- Atualiza saldo do cronograma quando nao houver  medicao eventual
 								If !Empty(CXN->CXN_PARCEL)
@@ -446,40 +445,40 @@ If lRet
 									CNF->(dbSetorder(2)) //-- CNF_FILIAL+CNF_CONTRA+CNF_REVISA+CNF_NUMERO+CNF_COMPET
 									CNF->(dbSeek(xFilial("CNF",cFilCTR)+CND->CND_CONTRA+CND->CND_REVISA+cCronog+CND->CND_COMPET))
 								EndIf
-	
+
 								If CNF->(Found())
 									cParcel := CNF->CNF_PARCEL
 									If lEstSld .And. !lPeSld
 										RecLock("CNF")
-											CNF->CNF_VLREAL -= xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
-											CNF->CNF_SALDO  += xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
-											If CNF->CNF_VLREAL == 0
-												CNF->CNF_DTREAL := CTOD("")
-											Else
-												//-- Atualiza a data de realizacao do Cronograma quando estornar medição parcial
-												aAreaCND := CND->(GetArea())
-												CNF->CNF_DTREAL := CTOD("")
-												CND->(dbSkip(-1))
-												While !CND->(Bof())
-													If CND->CND_CONTRA+CND->CND_REVISA = CNF->CNF_CONTRA+CNF->CNF_REVISA .And. Empty(CNF->CNF_DTREAL)
-														If 	!Empty(CND->CND_DTFIM) .And. CXN->CXN_PARCEL = CNF->CNF_PARCEL .And. ;
+										CNF->CNF_VLREAL -= xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
+										CNF->CNF_SALDO  += xMoeda(CXN->CXN_VLLIQD - nValExced ,CND->CND_MOEDA,CN9->CN9_MOEDA,dDtFim,nTamVlTot,,nTaxa)
+										If CNF->CNF_VLREAL == 0
+											CNF->CNF_DTREAL := CTOD("")
+										Else
+											//-- Atualiza a data de realizacao do Cronograma quando estornar medição parcial
+											aAreaCND := CND->(GetArea())
+											CNF->CNF_DTREAL := CTOD("")
+											CND->(dbSkip(-1))
+											While !CND->(Bof())
+												If CND->CND_CONTRA+CND->CND_REVISA = CNF->CNF_CONTRA+CNF->CNF_REVISA .And. Empty(CNF->CNF_DTREAL)
+													If 	!Empty(CND->CND_DTFIM) .And. CXN->CXN_PARCEL = CNF->CNF_PARCEL .And. ;
 															(Empty(CNF->CNF_DTREAL) .Or. CND->CND_DTFIM > CNF->CNF_DTREAL)
-															CNF->CNF_DTREAL := CND->CND_DTFIM
-														Endif
-													EndIf
-													CND->(dbSkip(-1))
-												EndDo
-												RestArea(aAreaCND)
-											EndIf
+														CNF->CNF_DTREAL := CND->CND_DTFIM
+													Endif
+												EndIf
+												CND->(dbSkip(-1))
+											EndDo
+											RestArea(aAreaCND)
+										EndIf
 										MsUnlock()
 									EndIf
 									//- ajusta os títulos provisórios
 									If lTitProv
-										
-	
+
+
 										//- Exclui título procisório gerado no encerramento da medição
 										CN100ETit(CND->CND_CONTRA,CND->CND_REVISA,cCronog,CNF->CNF_PARCEL,cFilCtr)
-	
+
 										//- Inclui título provisório do saldo atualizado da parcela
 										If CNF->CNF_SALDO > 0
 											CN100CTit(CND->CND_CONTRA,CND->CND_REVISA,cCronog,CNF->CNF_PARCEL,CNF->CNF_SALDO,cFilCtr)
@@ -487,12 +486,12 @@ If lRet
 									EndIf
 								EndIf
 							EndIf
-	
+
 							//- atualiza saldos de cronogramas fisico/financeiro
 							cChaveCNE := xFilial("CNE")+CND->(CND_CONTRA+CND_REVISA)+CXN->CXN_NUMPLA+CND->CND_NUMMED
 							CNE->(dbSetOrder(1))
 							CNE->(MsSeek(cChaveCNE))
-	
+
 							While !CNE->(Eof()) .And. cChaveCNE == CNE->(CNE_FILIAL+CNE_CONTRA+CNE_REVISA+CNE_NUMERO+CNE_NUMMED)
 								lMedComPlan := .F.
 								//-- Atualiza saldo dos itens da planilha, itens excedentes nao atualizam saldos
@@ -501,43 +500,43 @@ If lRet
 									If CNB->(dbSeek(xFilial("CNB",cFilCTR)+CNE->CNE_CONTRA+CNE->CNE_REVISA+CNE->CNE_NUMERO+CNE->CNE_ITEM))
 										If lEstSld .And. !lPeSld
 											RecLock("CNB",.F.)
-												If nServico == 1
-													CNB->CNB_QTDMED -= CNE->CNE_QUANT
-													CNB->CNB_SLDMED += Iif(lSemiFix,0,CNE->CNE_QUANT)
-												Else
-													CNB->CNB_QTDMED -= CNE->CNE_QTDORI
-													CNB->CNB_SLDMED += Iif(lSemiFix,0,CNE->CNE_QTDORI)
-												EndIf
+											If nServico == 1
+												CNB->CNB_QTDMED -= CNE->CNE_QUANT
+												CNB->CNB_SLDMED += Iif(lSemiFix,0,CNE->CNE_QUANT)
+											Else
+												CNB->CNB_QTDMED -= CNE->CNE_QTDORI
+												CNB->CNB_SLDMED += Iif(lSemiFix,0,CNE->CNE_QTDORI)
+											EndIf
 											MsUnlock()
 										EndIf
 										lMedComPlan := .T. //-- CAPTURO A VARIAVEL FLAG DE ITENS COM PLANILHA
 									EndIf
-	
+
 									//- atualiza saldo do cronograma físico
 									If lFisico
 										CNS->(dbSetOrder(1)) //-- CNS_FILIAL+CNS_CONTRA+CNS_REVISA+CNS_CRONOG+CNS_PARCEL+CNS_ITEM
 										If CNS->(dbSeek(cFilCNS+CND->CND_CONTRA+CND->CND_REVISA+cCronog+cParcel+CNE->CNE_ITEM))
 											If lEstSld .And. !lPeSld
 												RecLock("CNS",.F.)
-													CNS->CNS_RLZQTD -= CNE->CNE_QUANT
-													CNS->CNS_SLDQTD += CNE->CNE_QUANT
+												CNS->CNS_RLZQTD -= CNE->CNE_QUANT
+												CNS->CNS_SLDQTD += CNE->CNE_QUANT
 												MsUnlock()
 											EndIf
 										EndIf
 									EndIf
 								EndIf
-	
+
 								PcoDetLan("000355","04","CNTA120",.T.)
-	
+
 								If lRet .And. lCtbOnLine //CONTABILIZA ESTORNO DA MEDICAO - ITENS DO CONTRATO
-	
+
 									nLp69B := aScan(aLPGCT,{|x| x[1]=="69B"})
 									nLp69I := aScan(aLPGCT,{|x| x[1]=="69I"})
-	
+
 									If lUsaFlag
 										aAdd( aFlagCTB, {"CNE_DTLANC", dDataBase, "CNE", CNE->( Recno() ), 0, 0, 0} )
 									EndIf
-	
+
 									If aLPGCT[nLp69I,2]  .And. cEspCtr == '2' .And. CN9->CN9_DTINIC >= CTOD("01/01/2018") // - Ponto de lançamento padrão IFRS15
 										nDet += DetProva(nHead,'69I',cOrigem,cLoteGCT,,,,,,,,@aFlagCTB,{"CNE",CNE->(Recno())})
 										lCtbCNE := .T.
@@ -545,7 +544,7 @@ If lRet
 										nDet += DetProva(nHead,"69B","CNTA120",cLoteGCT,,,,,,,,,{"CNE",CNE->(Recno())})
 										lCtbCNE := .T.
 									EndIf
-	
+
 									If !lUsaFlag .And. lCtbCNE
 										If CNE->(Columnpos('CNE_DTLANC')) > 0
 											dbSelectArea("CNE")
@@ -554,9 +553,9 @@ If lRet
 											MsUnlock()
 										EndIf
 									EndIf
-	
+
 								EndIf
-	
+
 								If lMedComPlan
 									cLancCont := "69F"
 									cSeqPCOLan:= "06"
@@ -564,7 +563,7 @@ If lRet
 									cLancCont := "69D"
 									cSeqPCOLan:= "05"
 								Endif
-	
+
 								cBusca := xFilial("CNZ",cFilCTR)+ CNE->(CNE_CONTRA+CNE_REVISA+CNE_NUMMED+CNE_ITEM)
 								CNZ->(dbSetOrder(2)) //CNZ_FILIAL+CNZ_CONTRA+CNZ_REVISA+CNZ_NUMMED+CNZ_ITCONT+CNZ_ITEM
 								If CNZ->(dbSeek( cBusca ))
@@ -579,18 +578,18 @@ If lRet
 										CNZ->(DbSkip())
 									EndDo
 								Endif
-	
+
 								If CNE->CNE_EXCEDE == '1' .And. !lExcedNPrv	//Exclui excedentes no estorno
 									RecLock('CXN',.F.) //- Atualiza Totais da CXN
 									CXN->CXN_VLLIQD -= CNE->CNE_VLTOT
 									CXN->CXN_VLTOT  -= (CNE->CNE_VLTOT + CNE->CNE_MULTA - CNE->CNE_BONIF)
 									CXN->(MsUnlock())
-	
+
 									RecLock('CND',.F.) //- Atualiza Totais da CND
 									CND->CND_VLLIQD -= CNE->CNE_VLTOT
 									CND->CND_VLTOT 	-= (CNE->CNE_VLTOT + CNE->CNE_MULTA - CNE->CNE_BONIF)
 									CND->(MsUnlock())
-	
+
 									dbSelectArea('CNZ')
 									cChaveCNZ := CNE->(CNE_FILIAL+CNE_CONTRA+CNE_REVISA+CNE_NUMMED+CNE_NUMERO+CNE_ITEM)
 									CNZ->(dbSetOrder(5)) //CNZ_FILIAL+CNZ_CONTRA+CNZ_REVISA+CNZ_NUMMED+CNZ_CODPLA+CNZ_ITCONT+CNZ_ITEM
@@ -601,34 +600,34 @@ If lRet
 										CNZ->(MsUnlock())
 										CNZ->(dbSkip())
 									End
-	
+
 									RecLock('CNE',.F.)
 									CNE->(dbDelete())
 									CNE->(MsUnlock())
 								EndIf
-	
-	
+
+
 								CNE->(dbSkip())
 							EndDo
 
-	
+
 							If lPeSld//Chama ponto de entrada para atualizacao do saldo
 								ExecBlock("CN121ELD",.f.,.f.,{lMedEve,lFisico,cCronog,lFixo,lValor})
 							EndIf
-	
+
 							CN120HistMul( 2, NIL, CND->CND_CONTRA, CND->CND_NUMMED )//-- Estorna o historico de multas / bonificacoes do contrato
 							If !Empty(CND->CND_RETCAC) //-- Estorna o valor retido da caucao
 								CN120CaucRet(CND->CND_CONTRA,CND->CND_NUMMED,2,CND->CND_RETCAC)
 							EndIf
-	
+
 						EndIf
-	
+
 						PcoFinLan("000355")
-	
+
 						If lRet .And. lRecorre
-						//- Atualiza títulos provisórios
+							//- Atualiza títulos provisórios
 							If lTitProv
-						
+
 								// exclui a última parcela provisória se o parâmetro MV_CNTPPP é 0 ou 1
 								If lCriaProv
 									CN100ETit(CND->CND_CONTRA,CND->CND_REVISA,"RECORRENTE",CXN->CXN_PARCEL,cFilCtr,CXN->CXN_NUMPLA,.T.)
@@ -636,7 +635,7 @@ If lRet
 								// inclui titulo provisório da parcela atual
 								CN100RecTi(CND->CND_CONTRA,CND->CND_REVISA,CXN->CXN_PARCEL,CXN->CXN_NUMPLA,.T.)
 							Endif
-	
+
 							CNA->(dbSetOrder(1))
 							CNB->(dbSetOrder(1))
 							CNE->(dbSetOrder(1)) // CNE_FILIAL, CNE_CONTRA, CNE_REVISA, CNE_NUMERO, CNE_NUMMED, CNE_ITEM
@@ -644,23 +643,23 @@ If lRet
 							If lEstSld
 								While !CNE->(Eof()) .AND. CNE->(CNE_FILIAL+CNE_CONTRA+CNE_REVISA+CNE_NUMERO+CNE_NUMMED) == xFilial("CNE")+CXN->(CXN_CONTRA+CXN_REVISA+CXN_NUMPLA+CXN_NUMMED)
 									If 	CNE->CNE_QUANT > 0 .AND. CNA->(MsSeek(xFilial("CNA")+CNE->(CNE_CONTRA+CNE_REVISA+CNE_NUMERO)));
-										.AND. !Empty(CNA->CNA_PERIOD) .AND. CNA->CNA_RECMED == CND->CND_NUMMED
-	
+											.AND. !Empty(CNA->CNA_PERIOD) .AND. CNA->CNA_RECMED == CND->CND_NUMMED
+
 										//- Se é primeira medição verifica se foi pro-rata e atualiza CNB
 										If 	CNA->CNA_MEDEFE == 1 .AND. CNB->(MsSeek( xFilial("CNB")+CNE->(CNE_CONTRA+CNE_REVISA+CNE_NUMERO+CNE_ITEM))) ;
-											.AND. CNB->CNB_PARPROR > 0 .AND. !Empty(CNB->CNB_PRIMED)
+												.AND. CNB->CNB_PARPROR > 0 .AND. !Empty(CNB->CNB_PRIMED)
 											RecLock("CNB",.F.)
-												CNB->CNB_PRIMED := Ctod("")
+											CNB->CNB_PRIMED := Ctod("")
 											MsUnlock()
 										Endif
-	
+
 										//- Atualiza campos de controle dos contratos recorrentes na planilha
 										RecLock("CNA",.F.)
-											CNA->CNA_MEDEFE := CNA->CNA_MEDEFE - 1
-											CNA->CNA_PROMED := CNA->CNA_ULTMED
-											CNA->CNA_ULTMED := CND->CND_ULTMED
-											CNA->CNA_RECMED := CND->CND_RECMED
-											CNA->CNA_PROPAR	:= CXN->CXN_PARCEL
+										CNA->CNA_MEDEFE := CNA->CNA_MEDEFE - 1
+										CNA->CNA_PROMED := CNA->CNA_ULTMED
+										CNA->CNA_ULTMED := CND->CND_ULTMED
+										CNA->CNA_RECMED := CND->CND_RECMED
+										CNA->CNA_PROPAR	:= CXN->CXN_PARCEL
 										CNA->(MsUnlock())
 									Endif
 									CNE->(dbSkip())
@@ -669,19 +668,19 @@ If lRet
 						Endif
 						CXN->(dbSkip())
 					EndDo
-					
+
 					// atualiza campos de controle dos contratos recorrentes na medição
 					If lRet
 						RecLock("CND",.F.)
 						CND->CND_RECMED := Space(TamSx3("CND_RECMED")[1])
 						CND->CND_ULTMED := Ctod("")
-						If !lAutForn
-							CND->CND_DTFIM := CTOD("")
-							CND->CND_SITUAC:= "A"
-						EndIf
+
+						CND->CND_DTFIM := CTOD("")
+						CND->CND_SITUAC:= "A"
+
 						CND->(MsUnlock())
 					EndIf
-					
+
 					If lRet
 						For nX := 1 To Len(aDocuments) //-- Documentos encontrados para serem estornados
 							If cEspCtr == "1"
@@ -691,7 +690,7 @@ If lRet
 									If lCN121EPM
 										ExecBlock("CN121EPM",.F.,.F.)
 									EndIf
-		
+
 									MSExecAuto({|v,x,y,z,w| MATA120(v,x,y,z,w)},1,{{"C7_NUM",aDocuments[nX,2],NIL}},{},5,.F.) //Exclui pedido de compras
 									If lMsErroAuto
 										MostraErro()
@@ -701,49 +700,51 @@ If lRet
 								EndIf
 								//-- Verifica se o documento é Titulo a Pagar - SE2
 								If lRet .And. aDocuments[nX,1] == "3"
-					
+
 									aTitulo := {}
 									cNumTit	:= aDocuments[nX,2]
-				
-								BeginSql Alias "TMPSE2"
-								 SELECT *
-								 FROM	%Table:SE2% SE2
-								 WHERE SE2.E2_FILIAL = %xFilial:SE2%
-									AND SE2.E2_NUM = %Exp:cNumTit%
-									AND SE2.E2_PREFIXO = %Exp:cRetPrf%
-									AND SE2.E2_TIPO = %Exp:cTpTit%
-									AND SE2.%NotDel%
-								EndSql
-												
-								  While !TMPSE2->(EOF()) 
-									 aTitulo := {}
-									aTitulo := {}
-									
-									aAdd(aTitulo,{"E2_FILIAL"	, xFilial("SE2")	,NIL})
-									aAdd(aTitulo,{"E2_PREFIXO"	, cRetPrf			,NIL})
-									aAdd(aTitulo,{"E2_NUM"		, cNumTit	  		,NIL})
-									aAdd(aTitulo,{"E2_TIPO"		, cTpTit			,NIL})
-									aAdd(aTitulo,{"E2_ORIGEM"	, "CNTA121"			,NIL})
-									aAdd(aTitulo,{"E2_PARCELA"	, TMPSE2->E2_PARCELA,NIL})
-	
-									MSExecAuto({|x,y,z| FINA050(x,y,z)},aTitulo,,5)//Exclui títulos à pagar
-									If lMsErroAuto
-										MOSTRAERRO()
-										lRet:= .F.
-										Exit
-									Else
-										CN120EstSld(CND->CND_NUMMED) //Verificar
-									Endif
-									TMPSE2->(DbSkip())
-								  EndDo
-								  
-								  TMPSE2->(dbCloseArea())
-								  
+
+									BeginSql Alias "TMPSE2"
+										SELECT *
+										FROM
+											%Table:SE2% SE2
+										WHERE
+											SE2.E2_FILIAL = %xFilial:SE2%
+											AND SE2.E2_NUM = %Exp:cNumTit%
+											AND SE2.E2_PREFIXO = %Exp:cRetPrf%
+											AND SE2.E2_TIPO = %Exp:cTpTit%
+											AND SE2.%NotDel%
+									EndSql
+
+									While !TMPSE2->(EOF())
+										aTitulo := {}
+										aTitulo := {}
+
+										aAdd(aTitulo,{"E2_FILIAL"	, xFilial("SE2")	,NIL})
+										aAdd(aTitulo,{"E2_PREFIXO"	, cRetPrf			,NIL})
+										aAdd(aTitulo,{"E2_NUM"		, cNumTit	  		,NIL})
+										aAdd(aTitulo,{"E2_TIPO"		, cTpTit			,NIL})
+										aAdd(aTitulo,{"E2_ORIGEM"	, "CNTA121"			,NIL})
+										aAdd(aTitulo,{"E2_PARCELA"	, TMPSE2->E2_PARCELA,NIL})
+
+										MSExecAuto({|x,y,z| FINA050(x,y,z)},aTitulo,,5)//Exclui títulos à pagar
+										If lMsErroAuto
+											MOSTRAERRO()
+											lRet:= .F.
+											Exit
+										Else
+											CN120EstSld(CND->CND_NUMMED) //Verificar
+										Endif
+										TMPSE2->(DbSkip())
+									EndDo
+
+									TMPSE2->(dbCloseArea())
+
 								EndIf
 							Else
 								//-- Verifica se o documento é Pedido de Venda
 								If aDocuments[nX,1] == "2"
-							
+
 									MSExecAuto({|x,y,z| Mata410(x,y,z)},{{"C5_NUM",aDocuments[nX,2],NIL}},{},5) //-- Exclui pedido de venda
 									If lMsErroAuto
 										MostraErro()
@@ -753,45 +754,47 @@ If lRet
 								EndIf
 								//-- Verifica se o documento é Titulo a Receber - SE1
 								If lRet .And. aDocuments[nX,1] == "4"
-								
+
 									aTitulo := {}
 									aTitulo := {}
 									cNumTit	:= aDocuments[nX,2]
-									
-								  	BeginSql Alias "TMPSE1"
-									 SELECT *
-									 FROM	%Table:SE1% SE1
-									 WHERE SE1.E1_FILIAL = %xFilial:SE1%
-										AND SE1.E1_NUM = %Exp:cNumTit%
-										AND SE1.E1_PREFIXO = %Exp:cRetPrf%
-										AND SE1.%NotDel%
-									 EndSql
-									 While !TMPSE1->(EOF()) 
-									  aTitulo := {}
-									  aTitulo := {}
-									  aAdd(aTitulo,{"E1_FILIAL"	, xFilial("SE1")	,NIL})
-									  aAdd(aTitulo,{"E1_PREFIXO"	, cRetPrf			,NIL})
-									  aAdd(aTitulo,{"E1_NUM"		, cNumTit	  		,NIL})
-									  aAdd(aTitulo,{"E1_TIPO"		, cTpTit			,NIL})
-									  aAdd(aTitulo,{"E1_ORIGEM"	, "CNTA121"			,NIL})
-									  aAdd(aTitulo,{"E1_PARCELA"	, TMPSE1->E1_PARCELA	,NIL})
-									  MSExecAuto({|x,y| FINA040(x,y)},aTitulo,5)
-									    If lMsErroAuto
-										 MOSTRAERRO()
-										 lRet:= .F.
-										 Exit
-									    Else
-										 CN120EstSld(CND->CND_NUMMED)
-									    Endif
-									  TMPSE1->(DbSkip())
-								     EndDo
-	
+
+									BeginSql Alias "TMPSE1"
+										SELECT *
+										FROM
+											%Table:SE1% SE1
+										WHERE
+											SE1.E1_FILIAL = %xFilial:SE1%
+											AND SE1.E1_NUM = %Exp:cNumTit%
+											AND SE1.E1_PREFIXO = %Exp:cRetPrf%
+											AND SE1.%NotDel%
+									EndSql
+									While !TMPSE1->(EOF())
+										aTitulo := {}
+										aTitulo := {}
+										aAdd(aTitulo,{"E1_FILIAL"	, xFilial("SE1")	,NIL})
+										aAdd(aTitulo,{"E1_PREFIXO"	, cRetPrf			,NIL})
+										aAdd(aTitulo,{"E1_NUM"		, cNumTit	  		,NIL})
+										aAdd(aTitulo,{"E1_TIPO"		, cTpTit			,NIL})
+										aAdd(aTitulo,{"E1_ORIGEM"	, "CNTA121"			,NIL})
+										aAdd(aTitulo,{"E1_PARCELA"	, TMPSE1->E1_PARCELA	,NIL})
+										MSExecAuto({|x,y| FINA040(x,y)},aTitulo,5)
+										If lMsErroAuto
+											MOSTRAERRO()
+											lRet:= .F.
+											Exit
+										Else
+											CN120EstSld(CND->CND_NUMMED)
+										Endif
+										TMPSE1->(DbSkip())
+									EndDo
+
 									TMPSE1->(dbCloseArea())
-	
+
 								EndIf
 							EndIf
 						Next nX
-	
+
 						If lRet
 							aAreaCND  := CND->(GetArea()) 					//Guarda a posição atual da CND
 							CND->(MsGoTo(nReg)) 							//Posiciona na linha celecionada
@@ -799,32 +802,32 @@ If lRet
 							RestArea(aAreaCND) 								//Devolve a posição da CND
 						EndIf
 					EndIf
-		
-				If lAviso
-					If !lRet
-						Aviso("CNTA121",'','')				//"O documento não pode ser estornado"
-						DisarmTransaction()
-					ElseIf nTipo == 1  .And. nServico == 1
-						Aviso("CNTA121",OemToAnsi(''),'')	//"Medição/entrega estornada com sucesso"
+
+					If lAviso
+						If !lRet
+							conout("O documento não pode ser estornado")
+							DisarmTransaction()
+						ElseIf nTipo == 1  .And. nServico == 1
+							conout("Medição/entrega estornada com sucesso")
+						EndIf
 					EndIf
 				EndIf
-			EndIf
-		
-		End Transaction
-			
+
+			End Transaction
+
+		EndIf
+
+		//Restaura valor default da variável static lExcedNPrv
+		SetExcedNP(.F.)
 	EndIf
 
-	//Restaura valor default da variável static lExcedNPrv
-	SetExcedNP(.F.)
-EndIf
-
-If lRet .And. lCtbOnLine
-	RodaProva(nHead,nDet)
-	If nDet > 0
-		cA100Incl(cArqGCT,nHead,1,cLoteGCT,lDigita,lAglutina,,,,@aFlagCTB)
-		aFlagCTB := {}
-	Endif
-EndIf
+	If lRet .And. lCtbOnLine
+		RodaProva(nHead,nDet)
+		If nDet > 0
+			cA100Incl(cArqGCT,nHead,1,cLoteGCT,lDigita,lAglutina,,,,@aFlagCTB)
+			aFlagCTB := {}
+		Endif
+	EndIf
 
 Return lRet
 /*/{Protheus.doc} CN121DelCXJ
@@ -835,25 +838,175 @@ Exclui tabela CXJ
 /*/
 //-------------------------------------------------------------------
 Static Function CN121DelCXJ(cContra,cMedicao)
-Local aArea		:= GetArea()
+	Local aArea		:= GetArea()
 
-BeginSql Alias "CXJTMP"
-	SELECT CXJ.R_E_C_N_O_ AS RECNOCXJ
-	FROM	%Table:CXJ% CXJ
-	WHERE CXJ.CXJ_FILIAL = %xFilial:CXJ%
-		AND CXJ.CXJ_CONTRA = %Exp:cContra%
-		AND CXJ.CXJ_NUMMED = %Exp:cMedicao%
-		AND CXJ.%NotDel%
-EndSql
+	BeginSql Alias "CXJTMP"
+		SELECT
+			CXJ.R_E_C_N_O_ AS RECNOCXJ
+		FROM
+			%Table:CXJ% CXJ
+		WHERE
+			CXJ.CXJ_FILIAL = %xFilial:CXJ%
+			AND CXJ.CXJ_CONTRA = %Exp:cContra%
+			AND CXJ.CXJ_NUMMED = %Exp:cMedicao%
+			AND CXJ.%NotDel%
+	EndSql
 
-While !CXJTMP->(EOF())
-	CXJ->(dbGoTo(CXJTMP->RECNOCXJ))
-	RecLock("CXJ",.F.)
-	CXJ->(dbDelete())
-	CXJ->(MsUnlock())
-	CXJTMP->(dbSkip())
-EndDo
-CXJTMP->(dbCloseArea())
+	While !CXJTMP->(EOF())
+		CXJ->(dbGoTo(CXJTMP->RECNOCXJ))
+		RecLock("CXJ",.F.)
+		CXJ->(dbDelete())
+		CXJ->(MsUnlock())
+		CXJTMP->(dbSkip())
+	EndDo
+	CXJTMP->(dbCloseArea())
 
-RestArea(aArea)
+	RestArea(aArea)
 Return NIL
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} Cn121AutEst
+Função para estornar Aut. Fornecimento.
+@author israel.escorizza
+@since 22/08/2017
+@version V12.1.17
+@return lRet
+/*/
+//--------------------------------------------------------------------
+Static Function Cn121AutEst(nReg, lAviso)
+	Local cQuery 	:= ""
+	Local cPedidos 	:= ""
+	local cAliasQry := ""
+	Local cAliasSE2	:= ""
+
+	Local lGCTBloq 	:= SE2->(FieldPos("E2_MSBLQL")) > 0 //- Valida bloqueio de movimentação financeira pelo GCT
+	Local lBloqSE2  := .F.
+	Local lRet 		:= .T.
+
+	Default lAviso	:= .T.
+
+	Begin Transaction
+		dbSelectArea("CND")
+		CND->(MsGoTo(nReg)) //-- Posiciona na medicao
+
+		cQuery := " SELECT DISTINCT "
+		cQuery += " CXJ_NUMPED "
+		cQuery += " FROM "
+		cQuery += RetSQLName("CXJ") + " CXJ "
+		cQuery += " WHERE CXJ.CXJ_NUMMED = '"+CND->CND_NUMMED+"' AND CXJ.D_E_L_E_T_ = '' "
+
+		cQuery    := ChangeQuery( cQuery )
+		cAliasQry := GetNextAlias()
+		dbUseArea( .T., "TOPCONN", TcGenQry( ,,cQuery ), cAliasQry, .F., .T. )
+
+		While !(cAliasQry)->(Eof())
+			If !Empty(cPedidos)
+				cPedidos += ", "
+			EndIf
+			cPedidos += "'"+(cAliasQry)->CXJ_NUMPED+"'""
+			(cAliasQry)->(dbSkip())
+		End
+		(cAliasQry)->(dbCloseArea())
+
+		//- Seleciona a nota
+		cQuery := " SELECT DISTINCT "
+		cQuery += " SF1.F1_DOC, 	"
+		cQuery += " SF1.F1_SERIE, 	"
+		cQuery += " SF1.F1_TIPO,	"
+		cQuery += " SF1.F1_DUPL,	"
+		cQuery += " SF1.F1_PREFIXO,	"
+		cQuery += " F1_FORNECE, 	"
+		cQuery += " F1_LOJA 		"
+
+		cQuery += " FROM "
+		cQuery += RetSQLName("SF1") + " SF1, "
+		cQuery += RetSQLName("SD1") + " SD1 "
+
+		cQuery += " WHERE
+		cQuery += " SF1.F1_FILIAL  = '"+xFilial("SF1")+"' 	AND "
+		cQuery += " SD1.D1_FILIAL  = '"+xFilial("SD1")+"' 	AND "
+		cQuery += " SF1.F1_DOC     = SD1.D1_DOC     		AND "
+		cQuery += " SF1.F1_SERIE   = SD1.D1_SERIE   		AND "
+		cQuery += " SF1.F1_TIPO    = SD1.D1_TIPO    		AND "
+		cQuery += " SF1.F1_FORNECE = SD1.D1_FORNECE 		AND "
+		cQuery += " SF1.F1_LOJA    = SD1.D1_LOJA    		AND "
+		cQuery += " SD1.D1_PEDIDO  IN ("+cPedidos+") 		AND "
+		cQuery += " SF1.D_E_L_E_T_ = ' ' 					AND "
+		cQuery += " SD1.D_E_L_E_T_ = ' '"
+
+		cQuery    := ChangeQuery( cQuery )
+		cAliasQry := GetNextAlias()
+		dbUseArea( .T., "TOPCONN", TcGenQry( ,,cQuery ), cAliasQry, .F., .T. )
+
+		If !(cAliasQry)->(Eof())
+			//- Verifica os valores dos titulos
+			cQuery := " SELECT SUM(E2_VALOR) AS E2_VALOR,SUM(E2_SALDO) AS E2_SALDO "
+			cQuery += " FROM " + RetSQLName("SE2") + " SE2 "
+			cQuery += " WHERE SE2.E2_FILIAL  = '" + xFilial("SE2") + "'"
+			cQuery += " AND SE2.E2_NUM     = '" + (cAliasQry)->F1_DUPL + "'"
+			cQuery += " AND SE2.E2_PREFIXO = '" + IIf(Empty((cAliasQry)->F1_PREFIXO),&(SuperGetMV("MV_2DUPREF")),(cAliasQry)->F1_PREFIXO) + "'"
+			cQuery += " AND SE2.E2_FORNECE = '" + (cAliasQry)->F1_FORNECE + "'"
+			cQuery += " AND SE2.E2_LOJA    = '" + (cAliasQry)->F1_LOJA + "'"
+			cQuery += " AND SE2.E2_TIPO    = 'NF '"
+			cQuery += " AND SE2.D_E_L_E_T_ = ' '"
+
+			cQuery    := ChangeQuery( cQuery )
+			cAliasSE2 := GetNextAlias()
+			dbUseArea( .T., "TOPCONN", TcGenQry( ,,cQuery ), cAliasSE2, .F., .T. )
+
+			TCSetField( cAliasSE2, "E2_VALOR", "N", TamSX3("E2_VALOR")[1], TamSX3("E2_VALOR")[2] )
+			TCSetField( cAliasSE2, "E2_SALDO", "N", TamSX3("E2_SALDO")[1], TamSX3("E2_SALDO")[2] )
+
+			//- Verifica se houve movimentacoes nos titulos
+			If (cAliasSE2)->E2_VALOR > (cAliasSE2)->E2_SALDO
+				If lAviso
+					conout("Não foi possível estornar a autorização de fornecimento, pois a NFE: possui movimentações financeiras.")
+					lRet := .F.
+				EndIf
+				lBloqSE2 := .T.
+			EndIf
+			(cAliasSE2)->(dbCloseArea())
+
+			If !lBloqSE2 .And. lGCTBloq
+				//- Seleciona os titulos
+				cQuery := " SELECT SE2.R_E_C_N_O_ AS RECNO "
+				cQuery += " FROM " + RetSQLName("SE2") + " SE2 "
+				cQuery += " WHERE SE2.E2_FILIAL  = '" + xFilial("SE2") + "'"
+				cQuery += " AND SE2.E2_NUM     = '" + (cAliasQry)->F1_DUPL + "'"
+				cQuery += " AND SE2.E2_PREFIXO = '" + IIf(Empty((cAliasQry)->F1_PREFIXO),&(SuperGetMV("MV_2DUPREF")),(cAliasQry)->F1_PREFIXO) + "'"
+				cQuery += " AND SE2.E2_FORNECE = '" + (cAliasQry)->F1_FORNECE + "'"
+				cQuery += " AND SE2.E2_LOJA    = '" + (cAliasQry)->F1_LOJA + "'"
+				cQuery += " AND SE2.E2_TIPO    = 'NF '"
+				cQuery += " AND SE2.D_E_L_E_T_ = ' '"
+
+				cQuery    := ChangeQuery( cQuery )
+				cAliasSE2 := GetNextAlias()
+				dbUseArea( .T., "TOPCONN", TcGenQry( ,,cQuery ), cAliasSE2, .F., .T. )
+
+				//- Bloqueia os titulos
+				While !(cAliasSE2)->(Eof())
+					SE2->(MsGoTo((cAliasSE2)->RECNO))
+					RecLock("SE2",.F.)
+					SE2->E2_MSBLQL := "1"
+					MsUnlock()
+					(cAliasSE2)->(dbSkip())
+				EndDo
+				(cAliasSE2)->(dbCloseArea())
+			EndIf
+
+		EndIf
+		(cAliasQry)->(dbCloseArea())
+
+		If !lBloqSE2
+			RecLock("CND",.F.)
+			CND->CND_DTFIM 	:= CTOD("")
+			CND->CND_SITUAC := "FA"
+			MsUnlock()
+		EndIf
+	End Transaction
+
+	If lRet .And. lAviso
+		conout("Autorização de fornecimento estornada com sucesso")
+	EndIf
+
+Return

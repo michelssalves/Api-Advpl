@@ -1,0 +1,21 @@
+#INCLUDE "TOTVS.CH"
+#INCLUDE "TOPCONN.CH"
+#INCLUDE "FWMVCDEF.CH"
+#INCLUDE 'PROTHEUS.CH'
+
+User Function CN121ENC()
+
+    Local lInTrans:= PARAMIXB[1] //Verdadeiro caso seja dentro da transação, Falso fora da transação
+    Local aArea := FwGetArea()
+
+    If !lInTrans
+
+        RecLock("CND",.F.)
+        CND->CND_SITUAC := "AP"
+        CND->( MsUnLock())
+
+    EndIf
+
+    FwRestArea(aArea)
+
+Return

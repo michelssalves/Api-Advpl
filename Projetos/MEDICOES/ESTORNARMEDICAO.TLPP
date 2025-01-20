@@ -42,6 +42,10 @@ User Function EstornarMedicao(nRecno)
 	Default lAprRev := .F.
 	Default cMedErro:= ""
 
+	CUSERNAME := "Administrador"
+	__CUSERID := "000000"
+	NMODULO := 2
+
 	CND->(DbGoto(nRecno))
 
 	nReg		:= CND->(Recno())
@@ -110,6 +114,7 @@ User Function EstornarMedicao(nRecno)
 	RestArea(aArea)
 
 Return lContinua
+
 
 
 //------------------------------------------------------------------
@@ -197,9 +202,6 @@ Static Function CN121MedEst(nReg,lAviso,lAutoFor,lMedServ,lAprRev,cMedErro)
 	DEFAULT lMedServ	:= .F.
 	DEFAULT lAprRev		:= .F.
 
-	CUSERNAME := "Administrador"
-	__CUSERID := "000000"
-	NMODULO := 2
 
 	CND->(DbGoto(nReg))
 

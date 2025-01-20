@@ -27,7 +27,7 @@ Class TContratosService
 
     public Method New() Constructor
 
-    @Post("/protheus/:empresa/v1/estornar-medicao/")
+    @Post("/protheus/:empresa/three-away-match/estornar-medicao/")
     Public Method EstMedicao()
 
 EndClass

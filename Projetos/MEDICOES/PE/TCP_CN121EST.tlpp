@@ -1,0 +1,17 @@
+#INCLUDE "TOTVS.CH"
+#INCLUDE "TOPCONN.CH"
+#INCLUDE "FWMVCDEF.CH"
+#INCLUDE 'PROTHEUS.CH'
+
+User Function CN121EST()
+
+    Local lInTrans  := PARAMIXB[2] //Verdadeiro caso seja dentro da transação, Falso fora da transação
+
+    If lInTrans
+        MsgInfo("Chamada dentro da transação."  ,"U_CN121EST")
+    Else
+        MsgInfo("Chamada fora da transação."    ,"U_CN121EST")
+        //aqui enviar pro salesforce
+    EndIf
+
+Return

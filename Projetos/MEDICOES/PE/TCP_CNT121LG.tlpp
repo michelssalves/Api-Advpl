@@ -1,0 +1,11 @@
+#INCLUDE "TOTVS.CH"
+#INCLUDE "TOPCONN.CH"
+#INCLUDE "FWMVCDEF.CH"
+#INCLUDE 'PROTHEUS.CH'
+
+User Function CNT121LG()
+    Local aLegendas := ParamIXB[1]
+
+    aAdd(aLegendas, {"ALLtrim(CND_SITUAC) == 'AP'", "WHITE","Enviado para Aprovação"})
+
+Return aLegendas
